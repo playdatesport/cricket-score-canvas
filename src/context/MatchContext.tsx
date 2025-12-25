@@ -18,7 +18,7 @@ interface MatchContextType {
   addBall: (outcome: BallOutcome) => void;
   undoLastBall: () => void;
   changeStriker: () => void;
-  changeBowler: (bowler: Bowler) => void;
+  changeBowler: (bowlerName: string) => void;
   updateBatter: (batterId: string, updates: Partial<Batter>) => void;
   resetMatch: () => void;
   setupMatch: (data: MatchSetupData) => void;
@@ -28,6 +28,9 @@ interface MatchContextType {
   processWicket: (details: WicketDetails) => void;
   pendingWicket: boolean;
   setPendingWicket: (value: boolean) => void;
+  pendingBowlerChange: boolean;
+  setPendingBowlerChange: (value: boolean) => void;
+  lastBowlerName: string;
   isMatchSetup: boolean;
 }
 
@@ -104,6 +107,8 @@ const MatchContext = createContext<MatchContextType | undefined>(undefined);
 export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [matchState, setMatchState] = useState<MatchState>(getDefaultMatchState());
   const [pendingWicket, setPendingWicket] = useState(false);
+  const [pendingBowlerChange, setPendingBowlerChange] = useState(false);
+  const [lastBowlerName, setLastBowlerName] = useState('');
 
   const getSoundType = (outcome: BallOutcome) => {
     if (outcome === 'W') return 'wicket';
@@ -158,12 +163,14 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let newBalls = prev.battingTeam.balls;
       let newOvers = prev.battingTeam.overs;
       let newOversList = [...prev.overs];
+      let overEnded = false;
 
       if (!isExtra) {
         newBalls++;
         if (newBalls === 6) {
           newBalls = 0;
           newOvers++;
+          overEnded = true;
           const completedOver: Over = {
             number: newOvers,
             balls: newCurrentOver,
@@ -174,7 +181,13 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      const shouldRotateStrike = typeof outcome === 'number' && outcome % 2 === 1;
+      // Check if over ended and trigger bowler change
+      if (overEnded) {
+        setLastBowlerName(prev.currentBowler.name);
+        setPendingBowlerChange(true);
+      }
+
+      const shouldRotateStrike = (typeof outcome === 'number' && outcome % 2 === 1) || overEnded;
       const newBatters = prev.batters.map(batter => {
         if (batter.isOnStrike) {
           return {
@@ -219,6 +232,13 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return currentBatter || ab;
       });
 
+      // Update allBowlers
+      const existingBowlerIndex = prev.allBowlers.findIndex(b => b.id === prev.currentBowler.id);
+      let newAllBowlers = [...prev.allBowlers];
+      if (existingBowlerIndex >= 0) {
+        newAllBowlers[existingBowlerIndex] = newBowler;
+      }
+
       return {
         ...prev,
         battingTeam: {
@@ -230,12 +250,46 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         batters: newBatters,
         allBatters: newAllBatters,
         currentBowler: newBowler,
+        allBowlers: newAllBowlers,
         currentOver: newBalls === 0 && !isExtra ? [] : newCurrentOver,
         overs: newOversList,
         currentPartnership: newPartnership,
       };
     });
   }, [playFeedback]);
+
+  const changeBowler = useCallback((bowlerName: string) => {
+    setMatchState((prev) => {
+      // Check if this bowler has bowled before
+      const existingBowler = prev.allBowlers.find(b => b.name === bowlerName);
+      
+      let newBowler: Bowler;
+      let newAllBowlers = [...prev.allBowlers];
+
+      // Update previous bowler's stats in allBowlers
+      const prevBowlerIndex = newAllBowlers.findIndex(b => b.id === prev.currentBowler.id);
+      if (prevBowlerIndex >= 0) {
+        newAllBowlers[prevBowlerIndex] = prev.currentBowler;
+      } else if (prev.currentBowler.balls > 0 || prev.currentBowler.overs > 0) {
+        newAllBowlers.push(prev.currentBowler);
+      }
+
+      if (existingBowler) {
+        newBowler = existingBowler;
+      } else {
+        newBowler = createInitialBowler(`${Date.now()}`, bowlerName);
+        newAllBowlers.push(newBowler);
+      }
+
+      return {
+        ...prev,
+        currentBowler: newBowler,
+        allBowlers: newAllBowlers,
+      };
+    });
+    
+    setPendingBowlerChange(false);
+  }, []);
 
   const processWicket = useCallback((details: WicketDetails) => {
     setMatchState((prev) => {
@@ -259,10 +313,12 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let newBalls = prev.battingTeam.balls + 1;
       let newOvers = prev.battingTeam.overs;
       let newOversList = [...prev.overs];
+      let overEnded = false;
 
       if (newBalls === 6) {
         newBalls = 0;
         newOvers++;
+        overEnded = true;
         const completedOver: Over = {
           number: newOvers,
           balls: newCurrentOver,
@@ -270,6 +326,12 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           wickets: newCurrentOver.filter(b => b.isWicket).length,
         };
         newOversList.push(completedOver);
+      }
+
+      // Trigger bowler change if over ended
+      if (overEnded) {
+        setLastBowlerName(prev.currentBowler.name);
+        setPendingBowlerChange(true);
       }
 
       // Update outgoing batter
@@ -286,10 +348,19 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Create new batter
       const newBatter = createInitialBatter(`${Date.now()}`, details.newBatter, true);
 
-      // Update batters array
-      const newBatters = prev.batters
-        .filter(b => b.id !== striker.id)
-        .concat(newBatter);
+      // Update batters array - rotate strike if over ended
+      const nonStriker = prev.batters.find(b => !b.isOnStrike);
+      let newBatters: Batter[];
+      if (overEnded && nonStriker) {
+        newBatters = [
+          { ...nonStriker, isOnStrike: false },
+          { ...newBatter, isOnStrike: true },
+        ];
+      } else {
+        newBatters = prev.batters
+          .filter(b => b.id !== striker.id)
+          .concat(newBatter);
+      }
 
       // Add fall of wicket
       const newFallOfWickets: FallOfWicket[] = [
@@ -308,7 +379,6 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ? [...prev.partnerships, prev.currentPartnership]
         : prev.partnerships;
 
-      const nonStriker = prev.batters.find(b => !b.isOnStrike);
       const newCurrentPartnership: Partnership = {
         batter1: details.newBatter,
         batter2: nonStriker?.name || '',
@@ -333,6 +403,13 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .map(ab => ab.id === striker.id ? updatedStriker : ab)
         .concat(newBatter);
 
+      // Update allBowlers
+      const existingBowlerIndex = prev.allBowlers.findIndex(b => b.id === prev.currentBowler.id);
+      let newAllBowlers = [...prev.allBowlers];
+      if (existingBowlerIndex >= 0) {
+        newAllBowlers[existingBowlerIndex] = newBowler;
+      }
+
       return {
         ...prev,
         battingTeam: {
@@ -344,6 +421,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         batters: newBatters,
         allBatters: newAllBatters,
         currentBowler: newBowler,
+        allBowlers: newAllBowlers,
         currentOver: newBalls === 0 ? [] : newCurrentOver,
         overs: newOversList,
         fallOfWickets: newFallOfWickets,
@@ -387,13 +465,6 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ...batter,
         isOnStrike: !batter.isOnStrike,
       })),
-    }));
-  }, []);
-
-  const changeBowler = useCallback((bowler: Bowler) => {
-    setMatchState((prev) => ({
-      ...prev,
-      currentBowler: bowler,
     }));
   }, []);
 
@@ -507,6 +578,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resetMatch = useCallback(() => {
     setMatchState(getDefaultMatchState());
     setPendingWicket(false);
+    setPendingBowlerChange(false);
   }, []);
 
   return (
@@ -526,6 +598,9 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         processWicket,
         pendingWicket,
         setPendingWicket,
+        pendingBowlerChange,
+        setPendingBowlerChange,
+        lastBowlerName,
         isMatchSetup: matchState.matchStatus !== 'setup',
       }}
     >
