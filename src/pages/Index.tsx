@@ -2,7 +2,7 @@ import React from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Radio, Plus, FileText } from 'lucide-react';
+import { Radio, Plus, FileText, BarChart3 } from 'lucide-react';
 import MatchHeader from '@/components/cricket/MatchHeader';
 import LiveScore from '@/components/cricket/LiveScore';
 import BatterStats from '@/components/cricket/BatterStats';
@@ -62,7 +62,7 @@ const Index: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
       <MatchHeader details={matchState.matchDetails} />
       
       <LiveScore
@@ -83,16 +83,22 @@ const Index: React.FC = () => {
 
       {/* Fixed bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t border-border">
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link to="/scorecard" className="flex-1">
-            <Button variant="outline" className="w-full h-12 text-base font-semibold gap-2">
-              <FileText className="w-5 h-5" />
+            <Button variant="outline" className="w-full h-12 text-sm font-semibold gap-2">
+              <FileText className="w-4 h-4" />
               Scorecard
             </Button>
           </Link>
+          <Link to="/analytics" className="flex-1">
+            <Button variant="outline" className="w-full h-12 text-sm font-semibold gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </Button>
+          </Link>
           <Link to="/umpire" className="flex-1">
-            <Button className="w-full h-12 text-base font-semibold gap-2 gradient-primary">
-              <Radio className="w-5 h-5" />
+            <Button className="w-full h-12 text-sm font-semibold gap-2 gradient-primary">
+              <Radio className="w-4 h-4" />
               Umpire
             </Button>
           </Link>

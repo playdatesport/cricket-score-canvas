@@ -1,14 +1,26 @@
 import React from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText } from 'lucide-react';
+import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ScoringControls from '@/components/cricket/ScoringControls';
+import WicketModal from '@/components/cricket/WicketModal';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
-  const { matchState, addBall, undoLastBall, changeStriker, toggleSound, toggleVibration, isMatchSetup } = useMatch();
+  const { 
+    matchState, 
+    addBall, 
+    undoLastBall, 
+    changeStriker, 
+    toggleSound, 
+    toggleVibration, 
+    isMatchSetup,
+    pendingWicket,
+    setPendingWicket,
+    processWicket,
+  } = useMatch();
   const navigate = useNavigate();
 
   // Redirect to setup if match not configured
@@ -33,12 +45,31 @@ const Umpire: React.FC = () => {
     });
   };
 
+  // Get available batters (those who haven't batted yet)
+  const battedPlayers = matchState.allBatters.map(b => b.name);
+  const availableBatters = matchState.battingTeam.players.filter(
+    p => p.trim() && !battedPlayers.includes(p)
+  );
+
+  const outgoingBatter = matchState.batters.find(b => b.isOnStrike)?.name || '';
+
   if (!isMatchSetup) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Wicket Modal */}
+      <WicketModal
+        isOpen={pendingWicket}
+        onClose={() => setPendingWicket(false)}
+        onConfirm={processWicket}
+        outgoingBatter={outgoingBatter}
+        availableBatters={availableBatters}
+        fielders={matchState.bowlingTeam.players}
+        currentBowler={matchState.currentBowler.name}
+      />
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
@@ -96,20 +127,24 @@ const Umpire: React.FC = () => {
 
         {/* Current Batters */}
         <div className="mt-4 pt-4 border-t border-border">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-2">
             {matchState.batters.filter(b => !b.isOut).map((batter) => (
               <div
                 key={batter.id}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg ${
                   batter.isOnStrike ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
                 }`}
               >
-                <span className="font-medium text-foreground">{batter.name}</span>
-                <span className="text-lg font-bold text-foreground">{batter.runs}</span>
-                <span className="text-xs text-muted-foreground">({batter.balls})</span>
-                {batter.isOnStrike && (
-                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                )}
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground text-sm">{batter.name}</span>
+                  {batter.isOnStrike && (
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  )}
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-foreground">{batter.runs}</span>
+                  <span className="text-xs text-muted-foreground ml-1">({batter.balls})</span>
+                </div>
               </div>
             ))}
           </div>
@@ -134,12 +169,18 @@ const Umpire: React.FC = () => {
         </div>
       </div>
 
-      {/* Full Scorecard Link */}
-      <div className="px-4 mt-3">
-        <Link to="/scorecard">
+      {/* Quick Links */}
+      <div className="px-4 mt-3 flex gap-2">
+        <Link to="/scorecard" className="flex-1">
           <Button variant="outline" size="sm" className="w-full gap-2">
             <FileText className="w-4 h-4" />
-            View Full Scorecard
+            Scorecard
+          </Button>
+        </Link>
+        <Link to="/analytics" className="flex-1">
+          <Button variant="outline" size="sm" className="w-full gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Analytics
           </Button>
         </Link>
       </div>
