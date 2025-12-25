@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ScoringControls from '@/components/cricket/ScoringControls';
 import WicketModal from '@/components/cricket/WicketModal';
+import BowlerSelectionModal from '@/components/cricket/BowlerSelectionModal';
+import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
@@ -20,8 +22,13 @@ const Umpire: React.FC = () => {
     pendingWicket,
     setPendingWicket,
     processWicket,
+    pendingBowlerChange,
+    setPendingBowlerChange,
+    changeBowler,
+    lastBowlerName,
   } = useMatch();
   const navigate = useNavigate();
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Redirect to setup if match not configured
   React.useEffect(() => {
@@ -39,10 +46,7 @@ const Umpire: React.FC = () => {
   };
 
   const handleChangeBowler = () => {
-    toast({
-      title: "Change Bowler",
-      description: "Bowler change feature coming soon",
-    });
+    setPendingBowlerChange(true);
   };
 
   // Get available batters (those who haven't batted yet)
@@ -70,80 +74,104 @@ const Umpire: React.FC = () => {
         currentBowler={matchState.currentBowler.name}
       />
 
+      {/* Bowler Selection Modal */}
+      <BowlerSelectionModal
+        isOpen={pendingBowlerChange}
+        onClose={() => setPendingBowlerChange(false)}
+        onSelectBowler={changeBowler}
+        availableBowlers={matchState.bowlingTeam.players}
+        previousBowlers={matchState.allBowlers}
+        lastBowler={lastBowlerName}
+        overNumber={matchState.battingTeam.overs}
+      />
+
+      {/* Share Modal */}
+      <ShareScorecardModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        matchState={matchState}
+      />
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back</span>
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3">
+          <Link to="/" className="flex items-center gap-1 sm:gap-2 text-foreground">
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="font-medium text-sm sm:text-base hidden sm:inline">Back</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Radio className="w-5 h-5 text-primary animate-pulse" />
-            <h1 className="text-lg font-bold text-foreground">Umpire Panel</h1>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-primary animate-pulse" />
+            <h1 className="text-base sm:text-lg font-bold text-foreground">Umpire</h1>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="p-1.5 sm:p-2 rounded-full transition-colors text-muted-foreground hover:text-primary"
+            >
+              <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
             <button
               onClick={toggleSound}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                 matchState.soundEnabled ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
-              {matchState.soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {matchState.soundEnabled ? <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
             <button
               onClick={toggleVibration}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                 matchState.vibrationEnabled ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
-              <Smartphone className="w-5 h-5" />
+              <Smartphone className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Compact Score Display */}
-      <div className="bg-card mx-4 mt-4 rounded-xl shadow-card p-4">
+      <div className="bg-card mx-3 sm:mx-4 mt-3 sm:mt-4 rounded-xl shadow-card p-3 sm:p-4">
         <div className="flex items-center justify-between">
-          <div className="text-center">
-            <span className="text-sm text-muted-foreground">{matchState.battingTeam.name}</span>
-            <div className="text-2xl font-bold text-foreground">
+          <div className="text-center flex-1">
+            <span className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{matchState.battingTeam.name}</span>
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {matchState.battingTeam.score}/{matchState.battingTeam.wickets}
             </div>
           </div>
-          <div className="text-center px-4 py-2 rounded-full bg-primary/10">
-            <span className="text-lg font-bold text-primary">
+          <div className="text-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-primary/10 mx-2">
+            <span className="text-base sm:text-lg font-bold text-primary">
               {matchState.battingTeam.overs}.{matchState.battingTeam.balls}
             </span>
-            <div className="text-xs text-muted-foreground">OVERS</div>
+            <div className="text-[10px] sm:text-xs text-muted-foreground">OVERS</div>
           </div>
-          <div className="text-center">
-            <span className="text-sm text-muted-foreground">{matchState.bowlingTeam.name}</span>
-            <div className="text-2xl font-bold text-foreground">
+          <div className="text-center flex-1">
+            <span className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{matchState.bowlingTeam.name}</span>
+            <div className="text-xl sm:text-2xl font-bold text-foreground">
               {matchState.bowlingTeam.score}/{matchState.bowlingTeam.wickets}
             </div>
           </div>
         </div>
 
         {/* Current Batters */}
-        <div className="mt-4 pt-4 border-t border-border">
-          <div className="flex justify-between items-center gap-2">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
+          <div className="flex flex-col sm:flex-row gap-2">
             {matchState.batters.filter(b => !b.isOut).map((batter) => (
               <div
                 key={batter.id}
-                className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg ${
+                className={`flex-1 flex items-center justify-between px-2.5 sm:px-3 py-2 rounded-lg ${
                   batter.isOnStrike ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground text-sm">{batter.name}</span>
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+                  <span className="font-medium text-foreground text-xs sm:text-sm truncate">{batter.name}</span>
                   {batter.isOnStrike && (
-                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
                   )}
                 </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold text-foreground">{batter.runs}</span>
-                  <span className="text-xs text-muted-foreground ml-1">({batter.balls})</span>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-base sm:text-lg font-bold text-foreground">{batter.runs}</span>
+                  <span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5 sm:ml-1">({batter.balls})</span>
                 </div>
               </div>
             ))}
@@ -151,7 +179,7 @@ const Umpire: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="w-full mt-2 text-primary"
+            className="w-full mt-2 text-primary text-xs sm:text-sm h-8 sm:h-9"
             onClick={changeStriker}
           >
             Swap Striker
@@ -159,8 +187,8 @@ const Umpire: React.FC = () => {
         </div>
 
         {/* Current Bowler */}
-        <div className="mt-3 pt-3 border-t border-border">
-          <div className="flex justify-between items-center text-sm">
+        <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-border">
+          <div className="flex justify-between items-center text-xs sm:text-sm">
             <span className="text-muted-foreground">Bowler:</span>
             <span className="font-medium text-foreground">
               {matchState.currentBowler.name} - {matchState.currentBowler.overs}.{matchState.currentBowler.balls} - {matchState.currentBowler.runs}/{matchState.currentBowler.wickets}
@@ -170,17 +198,17 @@ const Umpire: React.FC = () => {
       </div>
 
       {/* Quick Links */}
-      <div className="px-4 mt-3 flex gap-2">
+      <div className="px-3 sm:px-4 mt-2 sm:mt-3 flex gap-2">
         <Link to="/scorecard" className="flex-1">
-          <Button variant="outline" size="sm" className="w-full gap-2">
-            <FileText className="w-4 h-4" />
-            Scorecard
+          <Button variant="outline" size="sm" className="w-full gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
+            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Scorecard</span>
           </Button>
         </Link>
         <Link to="/analytics" className="flex-1">
-          <Button variant="outline" size="sm" className="w-full gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Analytics
+          <Button variant="outline" size="sm" className="w-full gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9">
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Analytics</span>
           </Button>
         </Link>
       </div>
