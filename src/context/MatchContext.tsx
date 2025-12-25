@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { MatchState, Ball, BallOutcome, Batter, Bowler, Over } from '@/types/cricket';
+import { 
+  MatchState, Ball, BallOutcome, Batter, Bowler, Over, 
+  FallOfWicket, Partnership, MatchSetupData 
+} from '@/types/cricket';
+import { playSoundWithVibration, resumeAudioContext } from '@/utils/soundEffects';
 
 interface MatchContextType {
   matchState: MatchState;
@@ -9,64 +13,108 @@ interface MatchContextType {
   changeBowler: (bowler: Bowler) => void;
   updateBatter: (batterId: string, updates: Partial<Batter>) => void;
   resetMatch: () => void;
+  setupMatch: (data: MatchSetupData) => void;
+  toggleSound: () => void;
+  toggleVibration: () => void;
+  selectNewBatter: (name: string) => void;
+  isMatchSetup: boolean;
 }
 
-const initialBatters: Batter[] = [
-  { id: '1', name: 'R Sharma', runs: 54, balls: 32, fours: 6, sixes: 2, isOnStrike: true, isOut: false },
-  { id: '2', name: 'K Reddy', runs: 21, balls: 15, fours: 2, sixes: 1, isOnStrike: false, isOut: false },
-];
+const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
+  id,
+  name,
+  runs: 0,
+  balls: 0,
+  fours: 0,
+  sixes: 0,
+  isOnStrike,
+  isOut: false,
+});
 
-const initialBowler: Bowler = {
-  id: '1',
-  name: 'M Singh',
-  overs: 3,
-  balls: 4,
-  maidens: 1,
-  runs: 24,
-  wickets: 1,
-  economy: 6.46,
-};
+const createInitialBowler = (id: string, name: string): Bowler => ({
+  id,
+  name,
+  overs: 0,
+  balls: 0,
+  maidens: 0,
+  runs: 0,
+  wickets: 0,
+  economy: 0,
+  noBalls: 0,
+  wides: 0,
+});
 
-const initialMatchState: MatchState = {
+const getDefaultMatchState = (): MatchState => ({
   matchDetails: {
-    matchType: 'T20 League',
-    tossWinner: 'Mumbai',
-    tossDecision: 'bowl',
-    venue: 'Wankhede Stadium',
+    matchType: 'T20',
+    tossWinner: '',
+    tossDecision: 'bat',
+    venue: '',
+    date: new Date().toISOString().split('T')[0],
     time: '7:30 PM',
     ballType: 'White',
-    powerplay: 'PPs 6-11, 16-20',
+    totalOvers: 20,
   },
   battingTeam: {
-    name: 'Mumbai',
-    score: 178,
-    wickets: 5,
-    overs: 18,
-    balls: 4,
-  },
-  bowlingTeam: {
-    name: 'Delhi',
-    score: 125,
-    wickets: 2,
+    name: 'Team A',
+    shortName: 'TMA',
+    score: 0,
+    wickets: 0,
     overs: 0,
     balls: 0,
-    target: 179,
+    players: [],
   },
-  batters: initialBatters,
-  currentBowler: initialBowler,
+  bowlingTeam: {
+    name: 'Team B',
+    shortName: 'TMB',
+    score: 0,
+    wickets: 0,
+    overs: 0,
+    balls: 0,
+    players: [],
+  },
+  batters: [],
+  allBatters: [],
+  currentBowler: createInitialBowler('1', 'Select Bowler'),
+  allBowlers: [],
   overs: [],
   currentOver: [],
   isFirstInnings: true,
-  matchStatus: 'in_progress',
-};
+  matchStatus: 'setup',
+  fallOfWickets: [],
+  partnerships: [],
+  currentPartnership: { batter1: '', batter2: '', runs: 0, balls: 0 },
+  soundEnabled: true,
+  vibrationEnabled: true,
+});
 
 const MatchContext = createContext<MatchContextType | undefined>(undefined);
 
 export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [matchState, setMatchState] = useState<MatchState>(initialMatchState);
+  const [matchState, setMatchState] = useState<MatchState>(getDefaultMatchState());
+
+  const getSoundType = (outcome: BallOutcome) => {
+    if (outcome === 'W') return 'wicket';
+    if (outcome === 6) return 'six';
+    if (outcome === 4) return 'boundary';
+    if (outcome === 'WD') return 'wide';
+    if (outcome === 'NB') return 'noBall';
+    if (outcome === 0) return 'dot';
+    return 'run';
+  };
 
   const addBall = useCallback((outcome: BallOutcome) => {
+    resumeAudioContext();
+    
     setMatchState((prev) => {
+      // Play sound and vibrate
+      if (prev.soundEnabled || prev.vibrationEnabled) {
+        const soundType = getSoundType(outcome);
+        if (prev.soundEnabled && prev.vibrationEnabled) {
+          playSoundWithVibration(soundType);
+        }
+      }
+
       const isExtra = outcome === 'WD' || outcome === 'NB' || outcome === 'LB' || outcome === 'B';
       const isWicket = outcome === 'W';
       let runs = typeof outcome === 'number' ? outcome : 0;
@@ -91,13 +139,11 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let newOvers = prev.battingTeam.overs;
       let newOversList = [...prev.overs];
 
-      // Only count legal deliveries
       if (!isExtra) {
         newBalls++;
         if (newBalls === 6) {
           newBalls = 0;
           newOvers++;
-          // Save completed over
           const completedOver: Over = {
             number: newOvers,
             balls: newCurrentOver,
@@ -108,7 +154,6 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      // Update striker for odd runs
       const shouldRotateStrike = typeof outcome === 'number' && outcome % 2 === 1;
       const newBatters = prev.batters.map(batter => {
         if (batter.isOnStrike && !isWicket) {
@@ -127,16 +172,41 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return batter;
       });
 
+      // Update fall of wickets
+      let newFallOfWickets = [...prev.fallOfWickets];
+      if (isWicket) {
+        const striker = prev.batters.find(b => b.isOnStrike);
+        if (striker) {
+          newFallOfWickets.push({
+            wicketNumber: newWickets,
+            score: newScore,
+            overs: newOvers,
+            balls: newBalls,
+            batterName: striker.name,
+          });
+        }
+      }
+
+      // Update partnership
+      const newPartnership = {
+        ...prev.currentPartnership,
+        runs: prev.currentPartnership.runs + (typeof outcome === 'number' ? outcome : 0),
+        balls: prev.currentPartnership.balls + (isExtra ? 0 : 1),
+      };
+
       // Update bowler
       const newBowlerBalls = isExtra ? prev.currentBowler.balls : prev.currentBowler.balls + 1;
       const newBowlerOvers = newBowlerBalls === 6 ? prev.currentBowler.overs + 1 : prev.currentBowler.overs;
+      const totalBowlerBalls = newBowlerOvers * 6 + (newBowlerBalls === 6 ? 0 : newBowlerBalls);
       const newBowler: Bowler = {
         ...prev.currentBowler,
         balls: newBowlerBalls === 6 ? 0 : newBowlerBalls,
         overs: newBowlerOvers,
         runs: prev.currentBowler.runs + runs,
         wickets: prev.currentBowler.wickets + (isWicket ? 1 : 0),
-        economy: (prev.currentBowler.runs + runs) / (newBowlerOvers + newBowlerBalls / 6 || 1),
+        economy: totalBowlerBalls > 0 ? ((prev.currentBowler.runs + runs) / totalBowlerBalls) * 6 : 0,
+        wides: prev.currentBowler.wides + (outcome === 'WD' ? 1 : 0),
+        noBalls: prev.currentBowler.noBalls + (outcome === 'NB' ? 1 : 0),
       };
 
       return {
@@ -152,6 +222,8 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentBowler: newBowler,
         currentOver: newBalls === 0 && !isExtra ? [] : newCurrentOver,
         overs: newOversList,
+        fallOfWickets: newFallOfWickets,
+        currentPartnership: newPartnership,
       };
     });
   }, []);
@@ -207,8 +279,105 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   }, []);
 
+  const selectNewBatter = useCallback((name: string) => {
+    setMatchState((prev) => {
+      const newBatter = createInitialBatter(`${Date.now()}`, name, true);
+      const updatedBatters = prev.batters.map(b => 
+        b.isOnStrike ? { ...b, isOut: true, isOnStrike: false } : b
+      );
+      
+      return {
+        ...prev,
+        batters: [...updatedBatters.filter(b => !b.isOut), newBatter],
+        allBatters: [...prev.allBatters, newBatter],
+        currentPartnership: {
+          batter1: name,
+          batter2: prev.batters.find(b => !b.isOnStrike)?.name || '',
+          runs: 0,
+          balls: 0,
+        },
+      };
+    });
+  }, []);
+
+  const setupMatch = useCallback((data: MatchSetupData) => {
+    const totalOvers = data.matchType === 'T20' ? 20 : data.matchType === 'ODI' ? 50 : 90;
+    const battingFirst = data.tossDecision === 'bat' ? 'team1' : 'team2';
+    
+    const team1: MatchState['battingTeam'] = {
+      name: data.team1Name,
+      shortName: data.team1ShortName,
+      score: 0,
+      wickets: 0,
+      overs: 0,
+      balls: 0,
+      players: data.team1Players,
+    };
+
+    const team2: MatchState['bowlingTeam'] = {
+      name: data.team2Name,
+      shortName: data.team2ShortName,
+      score: 0,
+      wickets: 0,
+      overs: 0,
+      balls: 0,
+      players: data.team2Players,
+    };
+
+    const battingTeam = battingFirst === 'team1' ? team1 : team2;
+    const bowlingTeam = battingFirst === 'team1' ? team2 : team1;
+
+    const openingBatters = [
+      createInitialBatter('1', battingTeam.players[0] || 'Batter 1', true),
+      createInitialBatter('2', battingTeam.players[1] || 'Batter 2', false),
+    ];
+
+    const openingBowler = createInitialBowler('1', bowlingTeam.players[0] || 'Bowler 1');
+
+    setMatchState({
+      matchDetails: {
+        matchType: data.matchType,
+        tossWinner: data.tossWinner === 'team1' ? data.team1Name : data.team2Name,
+        tossDecision: data.tossDecision,
+        venue: data.venue,
+        date: data.date,
+        time: data.time,
+        ballType: data.matchType === 'Test' ? 'Red' : 'White',
+        totalOvers,
+      },
+      battingTeam,
+      bowlingTeam,
+      batters: openingBatters,
+      allBatters: openingBatters,
+      currentBowler: openingBowler,
+      allBowlers: [openingBowler],
+      overs: [],
+      currentOver: [],
+      isFirstInnings: true,
+      matchStatus: 'in_progress',
+      fallOfWickets: [],
+      partnerships: [],
+      currentPartnership: {
+        batter1: openingBatters[0].name,
+        batter2: openingBatters[1].name,
+        runs: 0,
+        balls: 0,
+      },
+      soundEnabled: true,
+      vibrationEnabled: true,
+    });
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setMatchState(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }));
+  }, []);
+
+  const toggleVibration = useCallback(() => {
+    setMatchState(prev => ({ ...prev, vibrationEnabled: !prev.vibrationEnabled }));
+  }, []);
+
   const resetMatch = useCallback(() => {
-    setMatchState(initialMatchState);
+    setMatchState(getDefaultMatchState());
   }, []);
 
   return (
@@ -221,6 +390,11 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         changeBowler,
         updateBatter,
         resetMatch,
+        setupMatch,
+        toggleSound,
+        toggleVibration,
+        selectNewBatter,
+        isMatchSetup: matchState.matchStatus !== 'setup',
       }}
     >
       {children}

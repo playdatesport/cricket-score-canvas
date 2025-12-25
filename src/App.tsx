@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { MatchProvider } from "./context/MatchContext";
 import Index from "./pages/Index";
 import Umpire from "./pages/Umpire";
+import MatchSetup from "./pages/MatchSetup";
+import FullScorecard from "./pages/FullScorecard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,7 +21,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/setup" element={<MatchSetup />} />
             <Route path="/umpire" element={<Umpire />} />
+            <Route path="/scorecard" element={<FullScorecard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
