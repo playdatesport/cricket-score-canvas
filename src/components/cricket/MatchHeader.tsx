@@ -42,7 +42,7 @@ const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
           </div>
           <div className="text-right">
             <span className="font-medium">{details.ballType}</span>
-            <span className="ml-4 text-muted-foreground">{details.powerplay}</span>
+            <span className="ml-4 text-muted-foreground">{details.totalOvers} Overs</span>
           </div>
         </div>
       </div>

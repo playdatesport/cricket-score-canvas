@@ -1,15 +1,22 @@
 import React from 'react';
 import { useMatch } from '@/context/MatchContext';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Radio } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import LiveScore from '@/components/cricket/LiveScore';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ScoringControls from '@/components/cricket/ScoringControls';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
-  const { matchState, addBall, undoLastBall, changeStriker } = useMatch();
+  const { matchState, addBall, undoLastBall, changeStriker, toggleSound, toggleVibration, isMatchSetup } = useMatch();
+  const navigate = useNavigate();
+
+  // Redirect to setup if match not configured
+  React.useEffect(() => {
+    if (!isMatchSetup) {
+      navigate('/setup');
+    }
+  }, [isMatchSetup, navigate]);
 
   const handleUndo = () => {
     undoLastBall();
@@ -26,6 +33,10 @@ const Umpire: React.FC = () => {
     });
   };
 
+  if (!isMatchSetup) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -39,7 +50,24 @@ const Umpire: React.FC = () => {
             <Radio className="w-5 h-5 text-primary animate-pulse" />
             <h1 className="text-lg font-bold text-foreground">Umpire Panel</h1>
           </div>
-          <div className="w-16" />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleSound}
+              className={`p-2 rounded-full transition-colors ${
+                matchState.soundEnabled ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              {matchState.soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={toggleVibration}
+              className={`p-2 rounded-full transition-colors ${
+                matchState.vibrationEnabled ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <Smartphone className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -94,6 +122,26 @@ const Umpire: React.FC = () => {
             Swap Striker
           </Button>
         </div>
+
+        {/* Current Bowler */}
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Bowler:</span>
+            <span className="font-medium text-foreground">
+              {matchState.currentBowler.name} - {matchState.currentBowler.overs}.{matchState.currentBowler.balls} - {matchState.currentBowler.runs}/{matchState.currentBowler.wickets}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Full Scorecard Link */}
+      <div className="px-4 mt-3">
+        <Link to="/scorecard">
+          <Button variant="outline" size="sm" className="w-full gap-2">
+            <FileText className="w-4 h-4" />
+            View Full Scorecard
+          </Button>
+        </Link>
       </div>
 
       {/* Current Over */}
