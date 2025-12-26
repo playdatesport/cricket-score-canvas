@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { 
   MatchState, Ball, BallOutcome, Batter, Bowler, Over, 
-  FallOfWicket, Partnership, MatchSetupData, DismissalType 
+  FallOfWicket, Partnership, MatchSetupData, DismissalType, MatchResult, InningsData
 } from '@/types/cricket';
 import { playSoundWithVibration, playSound, vibrate, resumeAudioContext } from '@/utils/soundEffects';
 
@@ -32,6 +32,10 @@ interface MatchContextType {
   setPendingBowlerChange: (value: boolean) => void;
   lastBowlerName: string;
   isMatchSetup: boolean;
+  endInnings: () => void;
+  startSecondInnings: () => void;
+  showInningsBreak: boolean;
+  setShowInningsBreak: (value: boolean) => void;
 }
 
 const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
@@ -109,6 +113,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [pendingWicket, setPendingWicket] = useState(false);
   const [pendingBowlerChange, setPendingBowlerChange] = useState(false);
   const [lastBowlerName, setLastBowlerName] = useState('');
+  const [showInningsBreak, setShowInningsBreak] = useState(false);
 
   const getSoundType = (outcome: BallOutcome) => {
     if (outcome === 'W') return 'wicket';
@@ -579,6 +584,182 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMatchState(getDefaultMatchState());
     setPendingWicket(false);
     setPendingBowlerChange(false);
+    setShowInningsBreak(false);
+  }, []);
+
+  const getMatchResult = useCallback((battingScore: number, battingWickets: number, target: number, bowlingTeamName: string, battingTeamName: string, remainingBalls: number): MatchResult => {
+    if (battingScore >= target) {
+      const wicketsLeft = 10 - battingWickets;
+      return {
+        winner: battingTeamName,
+        margin: `by ${wicketsLeft} wicket${wicketsLeft !== 1 ? 's' : ''}`,
+        resultText: `${battingTeamName} wins!`,
+      };
+    } else if (battingScore === target - 1 && remainingBalls === 0) {
+      return {
+        winner: null,
+        margin: '',
+        resultText: 'Match Tied!',
+      };
+    } else {
+      const runsShort = target - battingScore - 1;
+      return {
+        winner: bowlingTeamName,
+        margin: `by ${runsShort} run${runsShort !== 1 ? 's' : ''}`,
+        resultText: `${bowlingTeamName} wins!`,
+      };
+    }
+  }, []);
+
+  const endInnings = useCallback(() => {
+    setMatchState(prev => {
+      if (prev.isFirstInnings) {
+        // End first innings - show innings break
+        setShowInningsBreak(true);
+        return {
+          ...prev,
+          matchStatus: 'innings_break',
+        };
+      } else {
+        // End second innings - calculate result
+        const target = prev.bowlingTeam.target || prev.battingTeam.score + 1;
+        const result = getMatchResult(
+          prev.battingTeam.score,
+          prev.battingTeam.wickets,
+          target,
+          prev.bowlingTeam.name,
+          prev.battingTeam.name,
+          0
+        );
+        return {
+          ...prev,
+          matchStatus: 'completed',
+          matchResult: result,
+        };
+      }
+    });
+  }, [getMatchResult]);
+
+  const startSecondInnings = useCallback(() => {
+    setMatchState(prev => {
+      const target = prev.battingTeam.score + 1;
+      
+      // Save first innings data
+      const firstInningsData: InningsData = {
+        battingTeam: { ...prev.battingTeam },
+        bowlingTeam: { ...prev.bowlingTeam },
+        allBatters: [...prev.allBatters],
+        allBowlers: [...prev.allBowlers],
+        overs: [...prev.overs],
+        fallOfWickets: [...prev.fallOfWickets],
+        partnerships: [...prev.partnerships],
+      };
+
+      // Swap teams
+      const newBattingTeam = {
+        ...prev.bowlingTeam,
+        score: 0,
+        wickets: 0,
+        overs: 0,
+        balls: 0,
+        target,
+      };
+
+      const newBowlingTeam = {
+        ...prev.battingTeam,
+        target: undefined,
+      };
+
+      // Create opening batters for second innings
+      const openingBatters = [
+        createInitialBatter('s1', newBattingTeam.players[0] || 'Batter 1', true),
+        createInitialBatter('s2', newBattingTeam.players[1] || 'Batter 2', false),
+      ];
+
+      // Create opening bowler for second innings
+      const openingBowler = createInitialBowler('s1', newBowlingTeam.players[0] || 'Bowler 1');
+
+      return {
+        ...prev,
+        battingTeam: newBattingTeam,
+        bowlingTeam: newBowlingTeam,
+        batters: openingBatters,
+        allBatters: openingBatters,
+        currentBowler: openingBowler,
+        allBowlers: [openingBowler],
+        overs: [],
+        currentOver: [],
+        isFirstInnings: false,
+        matchStatus: 'in_progress',
+        fallOfWickets: [],
+        partnerships: [],
+        currentPartnership: {
+          batter1: openingBatters[0].name,
+          batter2: openingBatters[1].name,
+          runs: 0,
+          balls: 0,
+        },
+        firstInningsData,
+      };
+    });
+    
+    setShowInningsBreak(false);
+    setPendingBowlerChange(true);
+    setLastBowlerName('');
+  }, []);
+
+  // Check for match completion after each ball in second innings
+  const checkMatchCompletion = useCallback((state: MatchState): MatchState => {
+    if (state.isFirstInnings) return state;
+    
+    const target = state.battingTeam.target;
+    if (!target) return state;
+
+    const totalBalls = state.matchDetails.totalOvers * 6;
+    const ballsBowled = state.battingTeam.overs * 6 + state.battingTeam.balls;
+    const remainingBalls = totalBalls - ballsBowled;
+
+    // Check if target reached
+    if (state.battingTeam.score >= target) {
+      const wicketsLeft = 10 - state.battingTeam.wickets;
+      return {
+        ...state,
+        matchStatus: 'completed',
+        matchResult: {
+          winner: state.battingTeam.name,
+          margin: `by ${wicketsLeft} wicket${wicketsLeft !== 1 ? 's' : ''}`,
+          resultText: `${state.battingTeam.name} wins!`,
+        },
+      };
+    }
+
+    // Check if all out or overs finished
+    if (state.battingTeam.wickets >= 10 || remainingBalls === 0) {
+      if (state.battingTeam.score === target - 1) {
+        return {
+          ...state,
+          matchStatus: 'completed',
+          matchResult: {
+            winner: null,
+            margin: '',
+            resultText: 'Match Tied!',
+          },
+        };
+      } else {
+        const runsShort = target - state.battingTeam.score - 1;
+        return {
+          ...state,
+          matchStatus: 'completed',
+          matchResult: {
+            winner: state.bowlingTeam.name,
+            margin: `by ${runsShort} run${runsShort !== 1 ? 's' : ''}`,
+            resultText: `${state.bowlingTeam.name} wins!`,
+          },
+        };
+      }
+    }
+
+    return state;
   }, []);
 
   return (
@@ -602,6 +783,10 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setPendingBowlerChange,
         lastBowlerName,
         isMatchSetup: matchState.matchStatus !== 'setup',
+        endInnings,
+        startSecondInnings,
+        showInningsBreak,
+        setShowInningsBreak,
       }}
     >
       {children}
