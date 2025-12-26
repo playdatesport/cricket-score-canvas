@@ -6,55 +6,63 @@ interface BatterStatsProps {
 }
 
 const BatterStats: React.FC<BatterStatsProps> = ({ batters }) => {
+  const activeBatters = batters.filter(b => !b.isOut);
+
   return (
-    <div className="bg-card rounded-xl p-4 shadow-card">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Batter</h3>
-      
-      <div className="space-y-3">
-        {batters.filter(b => !b.isOut).map((batter) => {
-          const strikeRate = batter.balls > 0 ? (batter.runs / batter.balls) * 100 : 0;
+    <div className="bg-card rounded-xl shadow-card border border-border/50 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-2.5 bg-muted/30 border-b border-border/50">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Batters</h3>
+          <div className="flex gap-4 text-[10px] text-muted-foreground font-medium">
+            <span className="w-8 text-center">R</span>
+            <span className="w-6 text-center">B</span>
+            <span className="w-6 text-center">4s</span>
+            <span className="w-6 text-center">6s</span>
+            <span className="w-10 text-center">SR</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Batters List */}
+      <div className="divide-y divide-border/30">
+        {activeBatters.map((batter) => {
+          const strikeRate = batter.balls > 0 ? ((batter.runs / batter.balls) * 100).toFixed(1) : '0.0';
           
           return (
             <div
               key={batter.id}
-              className={`flex items-center justify-between p-3 rounded-lg transition-all ${
-                batter.isOnStrike 
-                  ? 'bg-primary/5 border border-primary/20' 
-                  : 'bg-muted/50'
+              className={`px-4 py-3 transition-colors ${
+                batter.isOnStrike ? 'bg-primary/5' : ''
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-foreground">
-                  {batter.name}
-                </span>
-                {batter.isOnStrike && (
-                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xl font-bold text-foreground">{batter.runs}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="font-semibold text-sm text-foreground truncate">
+                    {batter.name}
+                  </span>
+                  {batter.isOnStrike && (
+                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  )}
+                </div>
+                <div className="flex gap-4 text-sm">
+                  <span className="w-8 text-center font-bold text-foreground">{batter.runs}</span>
+                  <span className="w-6 text-center text-muted-foreground">{batter.balls}</span>
+                  <span className="w-6 text-center text-muted-foreground">{batter.fours}</span>
+                  <span className="w-6 text-center text-muted-foreground">{batter.sixes}</span>
+                  <span className="w-10 text-center text-muted-foreground text-xs">{strikeRate}</span>
+                </div>
               </div>
             </div>
           );
         })}
-      </div>
 
-      {/* Stats Legend */}
-      <div className="flex justify-between mt-3 px-3 text-xs text-muted-foreground">
-        <span>R B</span>
-        <span>SR</span>
-      </div>
-      {batters.filter(b => !b.isOut).map((batter) => {
-        const strikeRate = batter.balls > 0 ? (batter.runs / batter.balls) * 100 : 0;
-        return (
-          <div key={`stats-${batter.id}`} className="flex justify-between px-3 text-sm mt-1">
-            <span className="text-muted-foreground">
-              {batter.runs} {batter.balls}
-            </span>
-            <span className="font-medium text-foreground">{strikeRate.toFixed(2)}</span>
+        {activeBatters.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No batters at crease
           </div>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 };
