@@ -7,30 +7,59 @@ interface BowlerStatsProps {
 
 const BowlerStats: React.FC<BowlerStatsProps> = ({ bowler }) => {
   return (
-    <div className="bg-card rounded-xl p-4 shadow-card">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Bowler</h3>
-      
-      <div className="p-3 rounded-lg bg-muted/50">
+    <div className="bg-card rounded-xl shadow-card border border-border/50 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-2.5 bg-muted/30 border-b border-border/50">
         <div className="flex items-center justify-between">
-          <span className="font-semibold text-foreground">{bowler.name}</span>
-          <span className="text-xl font-bold text-foreground">
-            {bowler.overs}.{bowler.balls}
-          </span>
-        </div>
-        <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-          <span>{bowler.overs}.{bowler.balls} {bowler.maidens}</span>
-          <span>{bowler.wickets} {bowler.runs}</span>
+          <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Bowler</h3>
+          <div className="flex gap-3 text-[10px] text-muted-foreground font-medium">
+            <span className="w-8 text-center">O</span>
+            <span className="w-6 text-center">M</span>
+            <span className="w-6 text-center">R</span>
+            <span className="w-6 text-center">W</span>
+            <span className="w-10 text-center">Econ</span>
+          </div>
         </div>
       </div>
 
-      {/* Economy */}
-      <div className="flex justify-between items-center mt-3 px-3">
-        <span className="text-sm text-muted-foreground">Economy</span>
-        <span className="text-lg font-bold text-foreground">{bowler.economy.toFixed(2)}</span>
+      {/* Bowler Row */}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-bold text-primary">🎯</span>
+            </div>
+            <span className="font-semibold text-sm text-foreground truncate">
+              {bowler.name}
+            </span>
+          </div>
+          <div className="flex gap-3 text-sm">
+            <span className="w-8 text-center font-medium text-foreground">
+              {bowler.overs}.{bowler.balls}
+            </span>
+            <span className="w-6 text-center text-muted-foreground">{bowler.maidens}</span>
+            <span className="w-6 text-center text-muted-foreground">{bowler.runs}</span>
+            <span className="w-6 text-center font-bold text-primary">{bowler.wickets}</span>
+            <span className="w-10 text-center text-muted-foreground text-xs">
+              {bowler.economy.toFixed(2)}
+            </span>
+          </div>
+        </div>
       </div>
-      <div className="flex justify-end px-3">
-        <span className="text-sm text-muted-foreground">{bowler.wickets}</span>
-      </div>
+
+      {/* Extras */}
+      {(bowler.wides > 0 || bowler.noBalls > 0) && (
+        <div className="px-4 py-2 bg-muted/20 border-t border-border/30">
+          <div className="flex gap-4 text-xs text-muted-foreground">
+            {bowler.wides > 0 && (
+              <span>Wides: <span className="font-medium text-foreground">{bowler.wides}</span></span>
+            )}
+            {bowler.noBalls > 0 && (
+              <span>No Balls: <span className="font-medium text-foreground">{bowler.noBalls}</span></span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

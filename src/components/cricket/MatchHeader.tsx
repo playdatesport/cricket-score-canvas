@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Settings } from 'lucide-react';
+import { MapPin, Clock, Circle } from 'lucide-react';
 import { MatchDetails } from '@/types/cricket';
 
 interface MatchHeaderProps {
@@ -8,41 +8,41 @@ interface MatchHeaderProps {
 
 const MatchHeader: React.FC<MatchHeaderProps> = ({ details }) => {
   return (
-    <div className="px-4 py-3">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-foreground">Match Details</h1>
-        <div className="flex items-center gap-3">
-          <button className="p-2 rounded-full hover:bg-muted transition-colors">
-            <Bell className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <button className="p-2 rounded-full hover:bg-muted transition-colors">
-            <Settings className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-card rounded-xl p-4 shadow-card">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold text-foreground">{details.matchType}</h2>
-          <p className="text-sm text-muted-foreground">
-            {details.tossWinner} won the toss and chose to {details.tossDecision}
-          </p>
+    <div className="bg-card border-b border-border/50">
+      <div className="px-4 py-4">
+        {/* Match Type Badge */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 text-xs font-bold gradient-primary text-primary-foreground rounded-full">
+              {details.matchType}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {details.totalOvers} Overs
+            </span>
+          </div>
+          <span className="px-2 py-1 text-[10px] font-medium bg-muted text-muted-foreground rounded-full">
+            {details.ballType} Ball
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-y-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">Ground Name</span>
-          </div>
-          <div className="text-right">
-            <span className="font-medium">{details.venue}</span>
-            <span className="ml-2 text-muted-foreground">{details.time}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Ball Type</span>
-          </div>
-          <div className="text-right">
-            <span className="font-medium">{details.ballType}</span>
-            <span className="ml-4 text-muted-foreground">{details.totalOvers} Overs</span>
+        {/* Toss Info */}
+        <p className="text-sm text-foreground mb-3">
+          <span className="font-semibold">{details.tossWinner}</span>
+          <span className="text-muted-foreground"> won the toss and elected to </span>
+          <span className="font-semibold capitalize">{details.tossDecision}</span>
+        </p>
+
+        {/* Venue & Time */}
+        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+          {details.venue && (
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              <span className="line-clamp-1">{details.venue}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{details.date} • {details.time}</span>
           </div>
         </div>
       </div>
