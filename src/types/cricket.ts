@@ -93,6 +93,22 @@ export interface MatchDetails {
   totalOvers: number;
 }
 
+export interface InningsData {
+  battingTeam: Team;
+  bowlingTeam: Team;
+  allBatters: Batter[];
+  allBowlers: Bowler[];
+  overs: Over[];
+  fallOfWickets: FallOfWicket[];
+  partnerships: Partnership[];
+}
+
+export interface MatchResult {
+  winner: string | null;
+  margin: string;
+  resultText: string;
+}
+
 export interface MatchState {
   matchDetails: MatchDetails;
   battingTeam: Team;
@@ -110,6 +126,8 @@ export interface MatchState {
   currentPartnership: Partnership;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
+  firstInningsData?: InningsData;
+  matchResult?: MatchResult;
 }
 
 export interface MatchSetupData {

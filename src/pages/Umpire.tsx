@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2 } from 'lucide-react';
+import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2, Flag, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ScoringControls from '@/components/cricket/ScoringControls';
 import WicketModal from '@/components/cricket/WicketModal';
 import BowlerSelectionModal from '@/components/cricket/BowlerSelectionModal';
 import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
+import InningsBreakModal from '@/components/cricket/InningsBreakModal';
+import MatchResultModal from '@/components/cricket/MatchResultModal';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
@@ -26,9 +28,15 @@ const Umpire: React.FC = () => {
     setPendingBowlerChange,
     changeBowler,
     lastBowlerName,
+    endInnings,
+    startSecondInnings,
+    showInningsBreak,
+    setShowInningsBreak,
+    resetMatch,
   } = useMatch();
   const navigate = useNavigate();
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
 
   // Redirect to setup if match not configured
   React.useEffect(() => {
@@ -36,6 +44,13 @@ const Umpire: React.FC = () => {
       navigate('/setup');
     }
   }, [isMatchSetup, navigate]);
+
+  // Show result modal when match completes
+  React.useEffect(() => {
+    if (matchState.matchStatus === 'completed' && matchState.matchResult) {
+      setShowResultModal(true);
+    }
+  }, [matchState.matchStatus, matchState.matchResult]);
 
   const handleUndo = () => {
     undoLastBall();
@@ -49,6 +64,21 @@ const Umpire: React.FC = () => {
     setPendingBowlerChange(true);
   };
 
+  const handleEndInnings = () => {
+    endInnings();
+    toast({
+      title: matchState.isFirstInnings ? "First innings ended" : "Match completed",
+      description: matchState.isFirstInnings 
+        ? `Target: ${matchState.battingTeam.score + 1} runs` 
+        : "View the full scorecard for details",
+    });
+  };
+
+  const handleNewMatch = () => {
+    resetMatch();
+    navigate('/setup');
+  };
+
   // Get available batters (those who haven't batted yet)
   const battedPlayers = matchState.allBatters.map(b => b.name);
   const availableBatters = matchState.battingTeam.players.filter(
@@ -56,6 +86,14 @@ const Umpire: React.FC = () => {
   );
 
   const outgoingBatter = matchState.batters.find(b => b.isOnStrike)?.name || '';
+
+  // Calculate required info for second innings
+  const target = matchState.battingTeam.target;
+  const runsNeeded = target ? target - matchState.battingTeam.score : 0;
+  const totalBalls = matchState.matchDetails.totalOvers * 6;
+  const ballsBowled = matchState.battingTeam.overs * 6 + matchState.battingTeam.balls;
+  const ballsRemaining = totalBalls - ballsBowled;
+  const requiredRate = ballsRemaining > 0 ? (runsNeeded / ballsRemaining) * 6 : 0;
 
   if (!isMatchSetup) {
     return null;
@@ -92,6 +130,33 @@ const Umpire: React.FC = () => {
         matchState={matchState}
       />
 
+      {/* Innings Break Modal */}
+      <InningsBreakModal
+        isOpen={showInningsBreak}
+        onClose={() => setShowInningsBreak(false)}
+        firstInningsScore={matchState.battingTeam.score}
+        firstInningsWickets={matchState.battingTeam.wickets}
+        firstInningsOvers={`${matchState.battingTeam.overs}.${matchState.battingTeam.balls}`}
+        battingTeamName={matchState.battingTeam.name}
+        bowlingTeamName={matchState.bowlingTeam.name}
+        target={matchState.battingTeam.score + 1}
+        onStartSecondInnings={startSecondInnings}
+      />
+
+      {/* Match Result Modal */}
+      {matchState.matchResult && (
+        <MatchResultModal
+          isOpen={showResultModal}
+          onClose={() => setShowResultModal(false)}
+          result={matchState.matchResult}
+          onNewMatch={handleNewMatch}
+          onViewScorecard={() => {
+            setShowResultModal(false);
+            navigate('/scorecard');
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3">
@@ -102,6 +167,11 @@ const Umpire: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-2">
             <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-primary animate-pulse" />
             <h1 className="text-base sm:text-lg font-bold text-foreground">Umpire</h1>
+            {!matchState.isFirstInnings && (
+              <span className="text-[10px] sm:text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
+                2nd Inn
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1">
             <button
@@ -130,6 +200,29 @@ const Umpire: React.FC = () => {
         </div>
       </div>
 
+      {/* Target Display (Second Innings Only) */}
+      {!matchState.isFirstInnings && target && (
+        <div className="mx-3 sm:mx-4 mt-3 bg-primary/10 border border-primary/30 rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium text-foreground">Target: {target}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-lg font-bold text-primary">{runsNeeded}</span>
+              <span className="text-xs text-muted-foreground ml-1">needed from</span>
+              <span className="text-lg font-bold text-foreground ml-1">{ballsRemaining}</span>
+              <span className="text-xs text-muted-foreground ml-1">balls</span>
+            </div>
+          </div>
+          <div className="mt-2 flex justify-end">
+            <span className="text-xs text-muted-foreground">
+              RRR: <span className="font-semibold text-foreground">{requiredRate.toFixed(2)}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Compact Score Display */}
       <div className="bg-card mx-3 sm:mx-4 mt-3 sm:mt-4 rounded-xl shadow-card p-3 sm:p-4">
         <div className="flex items-center justify-between">
@@ -146,9 +239,14 @@ const Umpire: React.FC = () => {
             <div className="text-[10px] sm:text-xs text-muted-foreground">OVERS</div>
           </div>
           <div className="text-center flex-1">
-            <span className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{matchState.bowlingTeam.name}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
+              {matchState.isFirstInnings ? matchState.bowlingTeam.name : matchState.firstInningsData?.battingTeam.name || matchState.bowlingTeam.name}
+            </span>
             <div className="text-xl sm:text-2xl font-bold text-foreground">
-              {matchState.bowlingTeam.score}/{matchState.bowlingTeam.wickets}
+              {matchState.isFirstInnings 
+                ? `${matchState.bowlingTeam.score}/${matchState.bowlingTeam.wickets}`
+                : `${matchState.firstInningsData?.battingTeam.score || 0}/${matchState.firstInningsData?.battingTeam.wickets || 0}`
+              }
             </div>
           </div>
         </div>
@@ -211,6 +309,15 @@ const Umpire: React.FC = () => {
             <span className="hidden xs:inline">Analytics</span>
           </Button>
         </Link>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm h-8 sm:h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
+          onClick={handleEndInnings}
+        >
+          <Flag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="hidden xs:inline">End Innings</span>
+        </Button>
       </div>
 
       {/* Current Over */}
