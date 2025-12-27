@@ -1,17 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Radio, Plus, FileText, BarChart3, Share2, Zap, Trophy, Target, TrendingUp, Clock } from 'lucide-react';
+import { Radio, Plus, FileText, BarChart3, Share2, Zap, Trophy, Target, TrendingUp, Clock, History } from 'lucide-react';
 import BatterStats from '@/components/cricket/BatterStats';
 import BowlerStats from '@/components/cricket/BowlerStats';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
+import MatchHistoryList from '@/components/cricket/MatchHistoryList';
+import { useMatchHistory } from '@/hooks/useMatchHistory';
+import { toast } from 'sonner';
 
 const Index: React.FC = () => {
-  const { matchState, isMatchSetup } = useMatch();
+  const { matchState, isMatchSetup, loadMatchState } = useMatch();
   const navigate = useNavigate();
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const { matches, loading, saveMatch, loadMatch, deleteMatch, clearCurrentMatch, fetchMatches } = useMatchHistory();
+
+  // Auto-save match when state changes
+  useEffect(() => {
+    if (isMatchSetup && matchState.matchStatus !== 'setup') {
+      const saveTimer = setTimeout(() => {
+        saveMatch(matchState);
+      }, 2000); // Debounce saves
+      return () => clearTimeout(saveTimer);
+    }
+  }, [matchState, isMatchSetup, saveMatch]);
+
+  const handleLoadMatch = useCallback(async (matchId: string) => {
+    const state = await loadMatch(matchId);
+    if (state) {
+      loadMatchState(state);
+      setShowHistory(false);
+      toast.success('Match loaded');
+      if (state.matchStatus === 'in_progress') {
+        navigate('/umpire');
+      }
+    }
+  }, [loadMatch, loadMatchState, navigate]);
+
+  const handleDeleteMatch = useCallback(async (matchId: string) => {
+    await deleteMatch(matchId);
+  }, [deleteMatch]);
 
   // Calculate stats
   const runRate = matchState.battingTeam.overs > 0 || matchState.battingTeam.balls > 0
@@ -56,38 +87,71 @@ const Index: React.FC = () => {
               </p>
             </div>
 
-            {/* CTA Button */}
-            <div className="w-full max-w-sm mb-12 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            {/* CTA Buttons */}
+            <div className="w-full max-w-sm mb-8 animate-slide-up space-y-3" style={{ animationDelay: '0.1s' }}>
               <Button
-                onClick={() => navigate('/setup')}
+                onClick={() => {
+                  clearCurrentMatch();
+                  navigate('/setup');
+                }}
                 className="w-full h-14 sm:h-16 text-lg sm:text-xl font-bold gap-3 gradient-primary shadow-glow hover:shadow-lg transition-all duration-300 rounded-2xl"
               >
                 <Plus className="w-6 h-6" />
                 Start New Match
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  fetchMatches();
+                  setShowHistory(!showHistory);
+                }}
+                className="w-full h-12 text-base font-semibold gap-2 rounded-xl hover-lift"
+              >
+                <History className="w-5 h-5" />
+                {showHistory ? 'Hide History' : 'Match History'}
+                {matches.length > 0 && !showHistory && (
+                  <span className="ml-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {matches.length}
+                  </span>
+                )}
+              </Button>
             </div>
 
-            {/* Features Grid */}
-            <div className="w-full max-w-lg animate-slide-up" style={{ animationDelay: '0.2s' }}>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { icon: Zap, title: 'Live Stats', desc: 'Real-time updates', color: 'text-warning' },
-                  { icon: Trophy, title: 'Full Scorecard', desc: 'Detailed records', color: 'text-success' },
-                  { icon: Target, title: 'Analytics', desc: 'Wagon wheel & charts', color: 'text-primary' },
-                  { icon: TrendingUp, title: 'Share', desc: 'Export & share', color: 'text-cricket-purple' },
-                ].map((feature, idx) => (
-                  <div
-                    key={feature.title}
-                    className="bg-card/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl shadow-card border border-border/50 hover-lift cursor-default"
-                    style={{ animationDelay: `${0.3 + idx * 0.1}s` }}
-                  >
-                    <feature.icon className={`w-7 h-7 ${feature.color} mb-3`} />
-                    <h3 className="font-bold text-sm sm:text-base text-foreground">{feature.title}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">{feature.desc}</p>
-                  </div>
-                ))}
+            {/* Match History */}
+            {showHistory && (
+              <div className="w-full max-w-lg mb-8 animate-slide-up">
+                <MatchHistoryList
+                  matches={matches}
+                  loading={loading}
+                  onLoadMatch={handleLoadMatch}
+                  onDeleteMatch={handleDeleteMatch}
+                />
               </div>
-            </div>
+            )}
+
+            {/* Features Grid */}
+            {!showHistory && (
+              <div className="w-full max-w-lg animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { icon: Zap, title: 'Live Stats', desc: 'Real-time updates', color: 'text-warning' },
+                    { icon: Trophy, title: 'Full Scorecard', desc: 'Detailed records', color: 'text-success' },
+                    { icon: Target, title: 'Analytics', desc: 'Wagon wheel & charts', color: 'text-primary' },
+                    { icon: TrendingUp, title: 'Share', desc: 'Export & share', color: 'text-cricket-purple' },
+                  ].map((feature, idx) => (
+                    <div
+                      key={feature.title}
+                      className="bg-card/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl shadow-card border border-border/50 hover-lift cursor-default"
+                      style={{ animationDelay: `${0.3 + idx * 0.1}s` }}
+                    >
+                      <feature.icon className={`w-7 h-7 ${feature.color} mb-3`} />
+                      <h3 className="font-bold text-sm sm:text-base text-foreground">{feature.title}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">{feature.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Bottom Tagline */}
             <p className="mt-10 text-xs text-muted-foreground/60 animate-pulse-soft">
