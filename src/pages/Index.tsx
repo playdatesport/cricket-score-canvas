@@ -99,22 +99,33 @@ const Index: React.FC = () => {
                 <Plus className="w-6 h-6" />
                 Start New Match
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  fetchMatches();
-                  setShowHistory(!showHistory);
-                }}
-                className="w-full h-12 text-base font-semibold gap-2 rounded-xl hover-lift"
-              >
-                <History className="w-5 h-5" />
-                {showHistory ? 'Hide History' : 'Match History'}
-                {matches.length > 0 && !showHistory && (
-                  <span className="ml-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                    {matches.length}
-                  </span>
-                )}
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    fetchMatches();
+                    setShowHistory(!showHistory);
+                  }}
+                  className="flex-1 h-12 text-sm font-semibold gap-2 rounded-xl hover-lift"
+                >
+                  <History className="w-4 h-4" />
+                  History
+                  {matches.length > 0 && !showHistory && (
+                    <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded-full">
+                      {matches.length}
+                    </span>
+                  )}
+                </Button>
+                <Link to="/statistics" className="flex-1">
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 text-sm font-semibold gap-2 rounded-xl hover-lift"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Stats
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {/* Match History */}
