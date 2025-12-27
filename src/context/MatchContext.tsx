@@ -36,6 +36,7 @@ interface MatchContextType {
   startSecondInnings: () => void;
   showInningsBreak: boolean;
   setShowInningsBreak: (value: boolean) => void;
+  loadMatchState: (state: MatchState) => void;
 }
 
 const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
@@ -762,6 +763,13 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return state;
   }, []);
 
+  const loadMatchState = useCallback((state: MatchState) => {
+    setMatchState(state);
+    setPendingWicket(false);
+    setPendingBowlerChange(false);
+    setShowInningsBreak(state.matchStatus === 'innings_break');
+  }, []);
+
   return (
     <MatchContext.Provider
       value={{
@@ -787,6 +795,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         startSecondInnings,
         showInningsBreak,
         setShowInningsBreak,
+        loadMatchState,
       }}
     >
       {children}

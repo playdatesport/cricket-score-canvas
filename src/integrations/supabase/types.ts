@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      matches: {
+        Row: {
+          created_at: string
+          id: string
+          match_details: Json
+          match_state: Json
+          status: string
+          team1_name: string
+          team1_score: number | null
+          team2_name: string
+          team2_score: number | null
+          updated_at: string
+          winner: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          match_details: Json
+          match_state: Json
+          status?: string
+          team1_name: string
+          team1_score?: number | null
+          team2_name: string
+          team2_score?: number | null
+          updated_at?: string
+          winner?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          match_details?: Json
+          match_state?: Json
+          status?: string
+          team1_name?: string
+          team1_score?: number | null
+          team2_name?: string
+          team2_score?: number | null
+          updated_at?: string
+          winner?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
