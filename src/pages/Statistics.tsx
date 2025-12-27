@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Trophy, Target, TrendingUp, Zap, Users, Award, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, TrendingUp, Zap, Users, Award, BarChart3, GitCompare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMatchHistory } from '@/hooks/useMatchHistory';
 import { usePlayerStats } from '@/hooks/usePlayerStats';
+import PerformanceChart from '@/components/cricket/PerformanceChart';
+import PlayerComparisonModal from '@/components/cricket/PlayerComparisonModal';
 
 const Statistics: React.FC = () => {
   const { matches, loading } = useMatchHistory();
-  const { topScorers, topWicketTakers, bestStrikeRates, bestEconomy } = usePlayerStats(matches);
+  const { 
+    topScorers, 
+    topWicketTakers, 
+    bestStrikeRates, 
+    bestEconomy,
+    battingStats,
+    bowlingStats,
+    allPlayerNames,
+    getPlayerHistory,
+  } = usePlayerStats(matches);
+
+  const [selectedChartPlayer, setSelectedChartPlayer] = useState('');
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparePlayer1, setComparePlayer1] = useState('');
+  const [comparePlayer2, setComparePlayer2] = useState('');
 
   if (loading) {
     return (
@@ -23,19 +39,50 @@ const Statistics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background pb-8">
+      {/* Comparison Modal */}
+      <PlayerComparisonModal
+        isOpen={showComparison}
+        onClose={() => setShowComparison(false)}
+        player1={comparePlayer1}
+        player2={comparePlayer2}
+        onPlayer1Change={setComparePlayer1}
+        onPlayer2Change={setComparePlayer2}
+        allPlayerNames={allPlayerNames}
+        battingStats={battingStats}
+        bowlingStats={bowlingStats}
+      />
+
       {/* Header */}
       <div className="gradient-primary text-primary-foreground">
         <div className="px-4 py-4">
-          <div className="flex items-center gap-3 mb-4">
-            <Link to="/">
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold">Statistics</h1>
-              <p className="text-xs opacity-80">Player leaderboards & trends</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Link to="/">
+                <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-bold">Statistics</h1>
+                <p className="text-xs opacity-80">Player leaderboards & trends</p>
+              </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary-foreground hover:bg-primary-foreground/10 gap-2"
+              onClick={() => {
+                if (allPlayerNames.length >= 2) {
+                  setComparePlayer1(allPlayerNames[0] || '');
+                  setComparePlayer2(allPlayerNames[1] || '');
+                }
+                setShowComparison(true);
+              }}
+              disabled={allPlayerNames.length < 2}
+            >
+              <GitCompare className="w-4 h-4" />
+              <span className="hidden sm:inline">Compare</span>
+            </Button>
           </div>
 
           {/* Quick Stats */}
@@ -76,14 +123,18 @@ const Statistics: React.FC = () => {
           </div>
         ) : (
           <Tabs defaultValue="batting" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="batting" className="gap-2">
-                <Target className="w-4 h-4" />
-                Batting
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="batting" className="gap-1.5 text-xs sm:text-sm">
+                <Target className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Batting</span>
               </TabsTrigger>
-              <TabsTrigger value="bowling" className="gap-2">
-                <Zap className="w-4 h-4" />
-                Bowling
+              <TabsTrigger value="bowling" className="gap-1.5 text-xs sm:text-sm">
+                <Zap className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Bowling</span>
+              </TabsTrigger>
+              <TabsTrigger value="trends" className="gap-1.5 text-xs sm:text-sm">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Trends</span>
               </TabsTrigger>
             </TabsList>
 
@@ -225,6 +276,15 @@ const Statistics: React.FC = () => {
                   )}
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="trends">
+              <PerformanceChart
+                selectedPlayer={selectedChartPlayer}
+                onPlayerChange={setSelectedChartPlayer}
+                allPlayerNames={allPlayerNames}
+                getPlayerHistory={getPlayerHistory}
+              />
             </TabsContent>
           </Tabs>
         )}

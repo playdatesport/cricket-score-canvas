@@ -30,6 +30,24 @@ export interface PlayerBowlingStats {
   bestRuns: number;
 }
 
+export interface MatchPerformance {
+  matchId: string;
+  matchDate: string;
+  matchIndex: number;
+  runs: number;
+  balls: number;
+  wickets: number;
+  runsConceded: number;
+  oversBowled: number;
+  strikeRate: number;
+  economy: number;
+}
+
+export interface PlayerMatchHistory {
+  name: string;
+  performances: MatchPerformance[];
+}
+
 export function usePlayerStats(matches: SavedMatch[]) {
   const battingStats = useMemo(() => {
     const playerMap = new Map<string, PlayerBattingStats>();
@@ -38,11 +56,10 @@ export function usePlayerStats(matches: SavedMatch[]) {
       const state = match.match_state;
       if (!state) return;
 
-      // Process first innings batters
       const firstInningsBatters = state.firstInningsData?.allBatters || [];
       const secondInningsBatters = state.allBatters || [];
 
-      const processBatters = (batters: Batter[], matchId: string) => {
+      const processBatters = (batters: Batter[]) => {
         batters.forEach((batter) => {
           if (!batter.name || batter.name === 'Batter 1' || batter.name === 'Batter 2') return;
           
@@ -76,11 +93,10 @@ export function usePlayerStats(matches: SavedMatch[]) {
         });
       };
 
-      processBatters(firstInningsBatters, match.id);
-      processBatters(secondInningsBatters, match.id);
+      processBatters(firstInningsBatters);
+      processBatters(secondInningsBatters);
     });
 
-    // Calculate averages and strike rates
     const stats = Array.from(playerMap.values()).map((player) => {
       const dismissals = player.innings - player.notOuts;
       return {
@@ -129,7 +145,6 @@ export function usePlayerStats(matches: SavedMatch[]) {
           existing.runs += bowler.runs;
           existing.wickets += bowler.wickets;
 
-          // Track best figures (most wickets, then fewest runs)
           if (
             bowler.wickets > existing.bestWickets ||
             (bowler.wickets === existing.bestWickets && bowler.runs < existing.bestRuns)
@@ -147,7 +162,6 @@ export function usePlayerStats(matches: SavedMatch[]) {
       processBowlers(secondInningsBowlers);
     });
 
-    // Calculate averages and economy
     const stats = Array.from(playerMap.values()).map((player) => ({
       ...player,
       overs: Math.round(player.overs * 10) / 10,
@@ -157,6 +171,113 @@ export function usePlayerStats(matches: SavedMatch[]) {
 
     return stats.sort((a, b) => b.wickets - a.wickets);
   }, [matches]);
+
+  // Match-by-match performance for trends
+  const playerMatchHistory = useMemo(() => {
+    const historyMap = new Map<string, MatchPerformance[]>();
+    
+    // Sort matches by date (oldest first for chronological order)
+    const sortedMatches = [...matches].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    sortedMatches.forEach((match, matchIndex) => {
+      const state = match.match_state;
+      if (!state) return;
+
+      const matchDate = match.match_state?.matchDetails?.date || match.created_at.split('T')[0];
+
+      // Process batters
+      const allBatters = [
+        ...(state.firstInningsData?.allBatters || []),
+        ...(state.allBatters || []),
+      ];
+
+      allBatters.forEach((batter) => {
+        if (!batter.name || batter.name === 'Batter 1' || batter.name === 'Batter 2') return;
+
+        const performances = historyMap.get(batter.name) || [];
+        
+        // Check if this match already recorded for this player
+        const existingIdx = performances.findIndex(p => p.matchId === match.id);
+        if (existingIdx >= 0) {
+          // Aggregate if player batted in both innings
+          performances[existingIdx].runs += batter.runs;
+          performances[existingIdx].balls += batter.balls;
+          performances[existingIdx].strikeRate = performances[existingIdx].balls > 0 
+            ? (performances[existingIdx].runs / performances[existingIdx].balls) * 100 
+            : 0;
+        } else {
+          performances.push({
+            matchId: match.id,
+            matchDate,
+            matchIndex: matchIndex + 1,
+            runs: batter.runs,
+            balls: batter.balls,
+            wickets: 0,
+            runsConceded: 0,
+            oversBowled: 0,
+            strikeRate: batter.balls > 0 ? (batter.runs / batter.balls) * 100 : 0,
+            economy: 0,
+          });
+        }
+
+        historyMap.set(batter.name, performances);
+      });
+
+      // Process bowlers
+      const allBowlers = [
+        ...(state.firstInningsData?.allBowlers || []),
+        ...(state.allBowlers || []),
+      ];
+
+      allBowlers.forEach((bowler) => {
+        if (!bowler.name || bowler.name === 'Select Bowler' || bowler.name === 'Bowler 1') return;
+        if (bowler.overs === 0 && bowler.balls === 0) return;
+
+        const performances = historyMap.get(bowler.name) || [];
+        const existingIdx = performances.findIndex(p => p.matchId === match.id);
+        
+        const overs = bowler.overs + bowler.balls / 6;
+        
+        if (existingIdx >= 0) {
+          performances[existingIdx].wickets += bowler.wickets;
+          performances[existingIdx].runsConceded += bowler.runs;
+          performances[existingIdx].oversBowled += overs;
+          performances[existingIdx].economy = performances[existingIdx].oversBowled > 0
+            ? performances[existingIdx].runsConceded / performances[existingIdx].oversBowled
+            : 0;
+        } else {
+          performances.push({
+            matchId: match.id,
+            matchDate,
+            matchIndex: matchIndex + 1,
+            runs: 0,
+            balls: 0,
+            wickets: bowler.wickets,
+            runsConceded: bowler.runs,
+            oversBowled: overs,
+            strikeRate: 0,
+            economy: overs > 0 ? bowler.runs / overs : 0,
+          });
+        }
+
+        historyMap.set(bowler.name, performances);
+      });
+    });
+
+    return Array.from(historyMap.entries()).map(([name, performances]) => ({
+      name,
+      performances: performances.sort((a, b) => a.matchIndex - b.matchIndex),
+    }));
+  }, [matches]);
+
+  const allPlayerNames = useMemo(() => {
+    const names = new Set<string>();
+    battingStats.forEach(p => names.add(p.name));
+    bowlingStats.forEach(p => names.add(p.name));
+    return Array.from(names).sort();
+  }, [battingStats, bowlingStats]);
 
   const topScorers = useMemo(() => battingStats.slice(0, 10), [battingStats]);
   const topWicketTakers = useMemo(() => bowlingStats.slice(0, 10), [bowlingStats]);
@@ -169,6 +290,10 @@ export function usePlayerStats(matches: SavedMatch[]) {
     [bowlingStats]
   );
 
+  const getPlayerHistory = (playerName: string): PlayerMatchHistory | undefined => {
+    return playerMatchHistory.find(p => p.name === playerName);
+  };
+
   return {
     battingStats,
     bowlingStats,
@@ -176,5 +301,8 @@ export function usePlayerStats(matches: SavedMatch[]) {
     topWicketTakers,
     bestStrikeRates,
     bestEconomy,
+    playerMatchHistory,
+    allPlayerNames,
+    getPlayerHistory,
   };
 }
