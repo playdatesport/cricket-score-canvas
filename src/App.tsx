@@ -9,6 +9,7 @@ import Umpire from "./pages/Umpire";
 import MatchSetup from "./pages/MatchSetup";
 import FullScorecard from "./pages/FullScorecard";
 import MatchAnalytics from "./pages/MatchAnalytics";
+import Statistics from "./pages/Statistics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/umpire" element={<Umpire />} />
             <Route path="/scorecard" element={<FullScorecard />} />
             <Route path="/analytics" element={<MatchAnalytics />} />
+            <Route path="/statistics" element={<Statistics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
