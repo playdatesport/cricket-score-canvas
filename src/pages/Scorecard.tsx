@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMatch } from '@/context/MatchContext';
+import { useTeamAssets } from '@/hooks/useTeamAssets';
 import MatchHeader from '@/components/cricket/MatchHeader';
 import LiveScore from '@/components/cricket/LiveScore';
 import BatterStats from '@/components/cricket/BatterStats';
@@ -11,6 +12,7 @@ import { Radio } from 'lucide-react';
 
 const Scorecard: React.FC = () => {
   const { matchState } = useMatch();
+  const { getTeamLogo, getPlayerAvatar } = useTeamAssets();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -19,11 +21,13 @@ const Scorecard: React.FC = () => {
       <LiveScore
         battingTeam={matchState.battingTeam}
         bowlingTeam={matchState.bowlingTeam}
+        battingTeamLogo={getTeamLogo(matchState.battingTeam.name)}
+        bowlingTeamLogo={getTeamLogo(matchState.bowlingTeam.name)}
       />
 
       <div className="px-4 grid grid-cols-2 gap-4">
-        <BatterStats batters={matchState.batters} />
-        <BowlerStats bowler={matchState.currentBowler} />
+        <BatterStats batters={matchState.batters} getPlayerAvatar={getPlayerAvatar} />
+        <BowlerStats bowler={matchState.currentBowler} getPlayerAvatar={getPlayerAvatar} />
       </div>
 
       <CurrentOver

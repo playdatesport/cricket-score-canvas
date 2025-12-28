@@ -1,11 +1,13 @@
 import React from 'react';
 import { Bowler } from '@/types/cricket';
+import PlayerAvatar from './PlayerAvatar';
 
 interface BowlerStatsProps {
   bowler: Bowler;
+  getPlayerAvatar?: (name: string) => string | null;
 }
 
-const BowlerStats: React.FC<BowlerStatsProps> = ({ bowler }) => {
+const BowlerStats: React.FC<BowlerStatsProps> = ({ bowler, getPlayerAvatar }) => {
   return (
     <div className="bg-card rounded-xl shadow-card border border-border/50 overflow-hidden">
       {/* Header */}
@@ -26,9 +28,11 @@ const BowlerStats: React.FC<BowlerStatsProps> = ({ bowler }) => {
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-bold text-primary">🎯</span>
-            </div>
+            <PlayerAvatar 
+              playerName={bowler.name}
+              avatarUrl={getPlayerAvatar?.(bowler.name)}
+              size="md"
+            />
             <span className="font-semibold text-sm text-foreground truncate">
               {bowler.name}
             </span>

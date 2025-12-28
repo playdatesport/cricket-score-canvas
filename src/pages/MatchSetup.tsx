@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMatch } from '@/context/MatchContext';
+import { useTeamAssets } from '@/hooks/useTeamAssets';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MatchSetupData, MatchType } from '@/types/cricket';
 import { Trophy, MapPin, Users, Clock, Coins } from 'lucide-react';
+import AvatarPicker from '@/components/cricket/AvatarPicker';
+import TeamLogo from '@/components/cricket/TeamLogo';
 
 const MatchSetup: React.FC = () => {
   const navigate = useNavigate();
   const { setupMatch } = useMatch();
+  const { uploadImage, saveTeam, savePlayer } = useTeamAssets();
   
   const [formData, setFormData] = useState<MatchSetupData>({
     matchType: 'T20',
@@ -26,6 +30,13 @@ const MatchSetup: React.FC = () => {
     tossDecision: 'bat',
   });
 
+
+  // Team logos and player avatars
+  const [team1Logo, setTeam1Logo] = useState<string | null>(null);
+  const [team2Logo, setTeam2Logo] = useState<string | null>(null);
+  const [team1Avatars, setTeam1Avatars] = useState<(string | null)[]>(Array(11).fill(null));
+  const [team2Avatars, setTeam2Avatars] = useState<(string | null)[]>(Array(11).fill(null));
+
   const [step, setStep] = useState(1);
 
   const handleInputChange = (field: keyof MatchSetupData, value: any) => {
@@ -39,7 +50,45 @@ const MatchSetup: React.FC = () => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handlePlayerAvatarChange = (team: 'team1Avatars' | 'team2Avatars', index: number, url: string) => {
+    if (team === 'team1Avatars') {
+      setTeam1Avatars(prev => prev.map((a, i) => i === index ? url : a));
+    } else {
+      setTeam2Avatars(prev => prev.map((a, i) => i === index ? url : a));
+    }
+  };
+
+  const handleUploadLogo = async (file: File): Promise<string | null> => {
+    return await uploadImage(file, 'logos');
+  };
+
+  const handleUploadAvatar = async (file: File): Promise<string | null> => {
+    return await uploadImage(file, 'avatars');
+  };
+
+  const handleSubmit = async () => {
+    // Save team logos
+    if (formData.team1Name) {
+      await saveTeam(formData.team1Name, formData.team1ShortName, team1Logo);
+    }
+    if (formData.team2Name) {
+      await saveTeam(formData.team2Name, formData.team2ShortName, team2Logo);
+    }
+
+    // Save player avatars
+    for (let i = 0; i < formData.team1Players.length; i++) {
+      const playerName = formData.team1Players[i];
+      if (playerName && team1Avatars[i]) {
+        await savePlayer(playerName, team1Avatars[i]);
+      }
+    }
+    for (let i = 0; i < formData.team2Players.length; i++) {
+      const playerName = formData.team2Players[i];
+      if (playerName && team2Avatars[i]) {
+        await savePlayer(playerName, team2Avatars[i]);
+      }
+    }
+
     setupMatch(formData);
     navigate('/umpire');
   };
@@ -146,9 +195,19 @@ const MatchSetup: React.FC = () => {
         {step === 2 && (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-card rounded-xl p-5 shadow-card">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold">Team 1 Details</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Team 1 Details</h2>
+                </div>
+                <AvatarPicker
+                  type="team"
+                  currentUrl={team1Logo}
+                  name={formData.team1Name || 'Team 1'}
+                  onSelect={setTeam1Logo}
+                  onUpload={handleUploadLogo}
+                  size="lg"
+                />
               </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -181,6 +240,14 @@ const MatchSetup: React.FC = () => {
                     {formData.team1Players.map((player, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                        <AvatarPicker
+                          type="player"
+                          currentUrl={team1Avatars[idx]}
+                          name={player || `Player ${idx + 1}`}
+                          onSelect={(url) => handlePlayerAvatarChange('team1Avatars', idx, url)}
+                          onUpload={handleUploadAvatar}
+                          size="sm"
+                        />
                         <Input
                           placeholder={`Player ${idx + 1}`}
                           value={player}
@@ -200,9 +267,19 @@ const MatchSetup: React.FC = () => {
         {step === 3 && (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-card rounded-xl p-5 shadow-card">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold">Team 2 Details</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Team 2 Details</h2>
+                </div>
+                <AvatarPicker
+                  type="team"
+                  currentUrl={team2Logo}
+                  name={formData.team2Name || 'Team 2'}
+                  onSelect={setTeam2Logo}
+                  onUpload={handleUploadLogo}
+                  size="lg"
+                />
               </div>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -235,6 +312,14 @@ const MatchSetup: React.FC = () => {
                     {formData.team2Players.map((player, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                        <AvatarPicker
+                          type="player"
+                          currentUrl={team2Avatars[idx]}
+                          name={player || `Player ${idx + 1}`}
+                          onSelect={(url) => handlePlayerAvatarChange('team2Avatars', idx, url)}
+                          onUpload={handleUploadAvatar}
+                          size="sm"
+                        />
                         <Input
                           placeholder={`Player ${idx + 1}`}
                           value={player}
