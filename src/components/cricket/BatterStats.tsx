@@ -1,11 +1,13 @@
 import React from 'react';
 import { Batter } from '@/types/cricket';
+import PlayerAvatar from './PlayerAvatar';
 
 interface BatterStatsProps {
   batters: Batter[];
+  getPlayerAvatar?: (name: string) => string | null;
 }
 
-const BatterStats: React.FC<BatterStatsProps> = ({ batters }) => {
+const BatterStats: React.FC<BatterStatsProps> = ({ batters, getPlayerAvatar }) => {
   const activeBatters = batters.filter(b => !b.isOut);
 
   return (
@@ -38,12 +40,15 @@ const BatterStats: React.FC<BatterStatsProps> = ({ batters }) => {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <PlayerAvatar 
+                    playerName={batter.name}
+                    avatarUrl={getPlayerAvatar?.(batter.name)}
+                    size="sm"
+                    isOnStrike={batter.isOnStrike}
+                  />
                   <span className="font-semibold text-sm text-foreground truncate">
                     {batter.name}
                   </span>
-                  {batter.isOnStrike && (
-                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  )}
                 </div>
                 <div className="flex gap-4 text-sm">
                   <span className="w-8 text-center font-bold text-foreground">{batter.runs}</span>

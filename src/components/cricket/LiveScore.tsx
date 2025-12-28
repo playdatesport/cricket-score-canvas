@@ -1,13 +1,15 @@
 import React from 'react';
 import { Team } from '@/types/cricket';
 import OversProgress from './OversProgress';
-
+import TeamLogo from './TeamLogo';
 interface LiveScoreProps {
   battingTeam: Team;
   bowlingTeam: Team;
   isFirstInnings?: boolean;
   firstInningsScore?: number;
   firstInningsWickets?: number;
+  battingTeamLogo?: string | null;
+  bowlingTeamLogo?: string | null;
 }
 
 const LiveScore: React.FC<LiveScoreProps> = ({ 
@@ -15,7 +17,9 @@ const LiveScore: React.FC<LiveScoreProps> = ({
   bowlingTeam,
   isFirstInnings = true,
   firstInningsScore,
-  firstInningsWickets 
+  firstInningsWickets,
+  battingTeamLogo,
+  bowlingTeamLogo,
 }) => {
   const runRate = battingTeam.score / (battingTeam.overs + battingTeam.balls / 6) || 0;
   const target = battingTeam.target;
@@ -32,10 +36,19 @@ const LiveScore: React.FC<LiveScoreProps> = ({
             {/* Batting Team */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                <h4 className="text-sm font-semibold text-foreground line-clamp-1">
-                  {battingTeam.shortName || battingTeam.name}
-                </h4>
+                <TeamLogo 
+                  teamName={battingTeam.name} 
+                  logoUrl={battingTeamLogo} 
+                  size="md" 
+                />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                    <h4 className="text-sm font-semibold text-foreground line-clamp-1">
+                      {battingTeam.shortName || battingTeam.name}
+                    </h4>
+                  </div>
+                </div>
               </div>
               <div className="text-3xl font-black text-foreground animate-score-update">
                 {battingTeam.score}
@@ -55,9 +68,16 @@ const LiveScore: React.FC<LiveScoreProps> = ({
 
             {/* Bowling Team */}
             <div className="flex-1 text-right">
-              <h4 className="text-sm font-semibold text-muted-foreground line-clamp-1 mb-1">
-                {bowlingTeam.shortName || bowlingTeam.name}
-              </h4>
+              <div className="flex items-center justify-end gap-2 mb-1">
+                <h4 className="text-sm font-semibold text-muted-foreground line-clamp-1">
+                  {bowlingTeam.shortName || bowlingTeam.name}
+                </h4>
+                <TeamLogo 
+                  teamName={bowlingTeam.name} 
+                  logoUrl={bowlingTeamLogo} 
+                  size="md" 
+                />
+              </div>
               <div className="text-3xl font-black text-muted-foreground">
                 {isFirstInnings 
                   ? `${bowlingTeam.score}/${bowlingTeam.wickets}`
