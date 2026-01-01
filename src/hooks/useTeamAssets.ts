@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+
+const TEAMS_STORAGE_KEY = 'cricket_teams';
+const PLAYERS_STORAGE_KEY = 'cricket_players';
 
 export interface TeamAsset {
   id: string;
@@ -36,114 +38,117 @@ export const PRESET_PLAYER_AVATARS = [
   { id: 'player-8', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=player8' },
 ];
 
+function getStoredTeams(): TeamAsset[] {
+  try {
+    const stored = localStorage.getItem(TEAMS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setStoredTeams(teams: TeamAsset[]) {
+  localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teams));
+}
+
+function getStoredPlayers(): PlayerAsset[] {
+  try {
+    const stored = localStorage.getItem(PLAYERS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setStoredPlayers(players: PlayerAsset[]) {
+  localStorage.setItem(PLAYERS_STORAGE_KEY, JSON.stringify(players));
+}
+
 export const useTeamAssets = () => {
   const [teams, setTeams] = useState<TeamAsset[]>([]);
   const [players, setPlayers] = useState<PlayerAsset[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTeams = async () => {
-    const { data, error } = await supabase.from('teams').select('*');
-    if (!error && data) {
-      setTeams(data);
-    }
+  const fetchTeams = () => {
+    setTeams(getStoredTeams());
   };
 
-  const fetchPlayers = async () => {
-    const { data, error } = await supabase.from('players').select('*');
-    if (!error && data) {
-      setPlayers(data);
-    }
+  const fetchPlayers = () => {
+    setPlayers(getStoredPlayers());
   };
 
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await Promise.all([fetchTeams(), fetchPlayers()]);
-      setLoading(false);
-    };
-    init();
+    setLoading(true);
+    fetchTeams();
+    fetchPlayers();
+    setLoading(false);
   }, []);
 
-  const uploadImage = async (file: File, folder: 'logos' | 'avatars'): Promise<string | null> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${Date.now()}.${fileExt}`;
-    
-    const { error } = await supabase.storage
-      .from('team-assets')
-      .upload(fileName, file);
-
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-
-    const { data } = supabase.storage
-      .from('team-assets')
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
+  const uploadImage = async (file: File, _folder: 'logos' | 'avatars'): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => {
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const saveTeam = async (name: string, shortName: string, logoUrl: string | null): Promise<TeamAsset | null> => {
-    // Check if team exists
-    const existing = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
+    const stored = getStoredTeams();
+    const existingIndex = stored.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
     
-    if (existing) {
-      const { data, error } = await supabase
-        .from('teams')
-        .update({ logo_url: logoUrl, short_name: shortName })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (!error && data) {
-        await fetchTeams();
-        return data;
-      }
+    if (existingIndex !== -1) {
+      stored[existingIndex] = {
+        ...stored[existingIndex],
+        short_name: shortName,
+        logo_url: logoUrl,
+      };
+      setStoredTeams(stored);
+      setTeams(stored);
+      return stored[existingIndex];
     } else {
-      const { data, error } = await supabase
-        .from('teams')
-        .insert({ name, short_name: shortName, logo_url: logoUrl })
-        .select()
-        .single();
-
-      if (!error && data) {
-        await fetchTeams();
-        return data;
-      }
+      const newTeam: TeamAsset = {
+        id: crypto.randomUUID(),
+        name,
+        short_name: shortName,
+        logo_url: logoUrl,
+      };
+      stored.push(newTeam);
+      setStoredTeams(stored);
+      setTeams(stored);
+      return newTeam;
     }
-    return null;
   };
 
   const savePlayer = async (name: string, avatarUrl: string | null, teamId?: string): Promise<PlayerAsset | null> => {
-    // Check if player exists
-    const existing = players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    const stored = getStoredPlayers();
+    const existingIndex = stored.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
     
-    if (existing) {
-      const { data, error } = await supabase
-        .from('players')
-        .update({ avatar_url: avatarUrl, team_id: teamId || null })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (!error && data) {
-        await fetchPlayers();
-        return data;
-      }
+    if (existingIndex !== -1) {
+      stored[existingIndex] = {
+        ...stored[existingIndex],
+        avatar_url: avatarUrl,
+        team_id: teamId || null,
+      };
+      setStoredPlayers(stored);
+      setPlayers(stored);
+      return stored[existingIndex];
     } else {
-      const { data, error } = await supabase
-        .from('players')
-        .insert({ name, avatar_url: avatarUrl, team_id: teamId || null })
-        .select()
-        .single();
-
-      if (!error && data) {
-        await fetchPlayers();
-        return data;
-      }
+      const newPlayer: PlayerAsset = {
+        id: crypto.randomUUID(),
+        name,
+        avatar_url: avatarUrl,
+        team_id: teamId || null,
+      };
+      stored.push(newPlayer);
+      setStoredPlayers(stored);
+      setPlayers(stored);
+      return newPlayer;
     }
-    return null;
   };
 
   const getTeamLogo = (teamName: string): string | null => {
@@ -156,18 +161,15 @@ export const useTeamAssets = () => {
     return player?.avatar_url || null;
   };
 
-  // Generate avatar from name if none exists
   const getPlayerAvatarOrGenerated = (playerName: string): string => {
     const existing = getPlayerAvatar(playerName);
     if (existing) return existing;
-    // Generate consistent avatar based on name
     return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(playerName)}&backgroundColor=0ea5e9,3b82f6,6366f1`;
   };
 
   const getTeamLogoOrGenerated = (teamName: string): string => {
     const existing = getTeamLogo(teamName);
     if (existing) return existing;
-    // Generate consistent logo based on name
     return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(teamName)}&backgroundColor=0ea5e9`;
   };
 
