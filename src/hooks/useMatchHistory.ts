@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { MatchState } from '@/types/cricket';
 import { toast } from 'sonner';
+
+const STORAGE_KEY = 'cricket_match_history';
 
 export interface SavedMatch {
   id: string;
@@ -17,34 +18,32 @@ export interface SavedMatch {
   winner: string | null;
 }
 
+function getStoredMatches(): SavedMatch[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setStoredMatches(matches: SavedMatch[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+}
+
 export function useMatchHistory() {
   const [matches, setMatches] = useState<SavedMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentMatchId, setCurrentMatchId] = useState<string | null>(null);
 
-  const fetchMatches = useCallback(async () => {
+  const fetchMatches = useCallback(() => {
     setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setMatches((data || []).map(m => ({
-        ...m,
-        match_state: m.match_state as unknown as MatchState,
-      })));
-    } catch (error) {
-      console.error('Error fetching matches:', error);
-      toast.error('Failed to load match history');
-    } finally {
-      setLoading(false);
-    }
+    const stored = getStoredMatches();
+    setMatches(stored.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
+    setLoading(false);
   }, []);
 
-  const saveMatch = useCallback(async (matchState: MatchState): Promise<string | null> => {
+  const saveMatch = useCallback((matchState: MatchState): string | null => {
     try {
       const isFirstInnings = matchState.isFirstInnings;
       const team1Score = isFirstInnings 
@@ -54,9 +53,37 @@ export function useMatchHistory() {
         ? 0 
         : matchState.battingTeam.score;
 
-      const matchData = {
-        match_details: JSON.parse(JSON.stringify(matchState.matchDetails)),
-        match_state: JSON.parse(JSON.stringify(matchState)),
+      const now = new Date().toISOString();
+      const stored = getStoredMatches();
+
+      if (currentMatchId) {
+        const index = stored.findIndex(m => m.id === currentMatchId);
+        if (index !== -1) {
+          stored[index] = {
+            ...stored[index],
+            updated_at: now,
+            match_details: matchState.matchDetails,
+            match_state: matchState,
+            status: matchState.matchStatus as string,
+            team1_name: isFirstInnings ? matchState.battingTeam.name : matchState.bowlingTeam.name,
+            team2_name: isFirstInnings ? matchState.bowlingTeam.name : matchState.battingTeam.name,
+            team1_score: team1Score,
+            team2_score: team2Score,
+            winner: matchState.matchResult?.winner || null,
+          };
+          setStoredMatches(stored);
+          setMatches(stored.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
+          return currentMatchId;
+        }
+      }
+
+      const newId = crypto.randomUUID();
+      const newMatch: SavedMatch = {
+        id: newId,
+        created_at: now,
+        updated_at: now,
+        match_details: matchState.matchDetails,
+        match_state: matchState,
         status: matchState.matchStatus as string,
         team1_name: isFirstInnings ? matchState.battingTeam.name : matchState.bowlingTeam.name,
         team2_name: isFirstInnings ? matchState.bowlingTeam.name : matchState.battingTeam.name,
@@ -65,25 +92,11 @@ export function useMatchHistory() {
         winner: matchState.matchResult?.winner || null,
       };
 
-      if (currentMatchId) {
-        const { error } = await supabase
-          .from('matches')
-          .update(matchData)
-          .eq('id', currentMatchId);
-
-        if (error) throw error;
-        return currentMatchId;
-      } else {
-        const { data, error } = await supabase
-          .from('matches')
-          .insert([matchData])
-          .select('id')
-          .single();
-
-        if (error) throw error;
-        setCurrentMatchId(data.id);
-        return data.id;
-      }
+      stored.push(newMatch);
+      setStoredMatches(stored);
+      setMatches(stored.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
+      setCurrentMatchId(newId);
+      return newId;
     } catch (error) {
       console.error('Error saving match:', error);
       toast.error('Failed to save match');
@@ -91,18 +104,15 @@ export function useMatchHistory() {
     }
   }, [currentMatchId]);
 
-  const loadMatch = useCallback(async (matchId: string): Promise<MatchState | null> => {
+  const loadMatch = useCallback((matchId: string): MatchState | null => {
     try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('id', matchId)
-        .single();
-
-      if (error) throw error;
-      
-      setCurrentMatchId(matchId);
-      return data.match_state as unknown as MatchState;
+      const stored = getStoredMatches();
+      const match = stored.find(m => m.id === matchId);
+      if (match) {
+        setCurrentMatchId(matchId);
+        return match.match_state;
+      }
+      return null;
     } catch (error) {
       console.error('Error loading match:', error);
       toast.error('Failed to load match');
@@ -110,16 +120,12 @@ export function useMatchHistory() {
     }
   }, []);
 
-  const deleteMatch = useCallback(async (matchId: string): Promise<boolean> => {
+  const deleteMatch = useCallback((matchId: string): boolean => {
     try {
-      const { error } = await supabase
-        .from('matches')
-        .delete()
-        .eq('id', matchId);
-
-      if (error) throw error;
-      
-      setMatches(prev => prev.filter(m => m.id !== matchId));
+      const stored = getStoredMatches();
+      const filtered = stored.filter(m => m.id !== matchId);
+      setStoredMatches(filtered);
+      setMatches(filtered.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
       if (currentMatchId === matchId) {
         setCurrentMatchId(null);
       }
