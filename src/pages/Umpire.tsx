@@ -10,6 +10,7 @@ import BowlerSelectionModal from '@/components/cricket/BowlerSelectionModal';
 import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
 import InningsBreakModal from '@/components/cricket/InningsBreakModal';
 import MatchResultModal from '@/components/cricket/MatchResultModal';
+import OpeningSelectionModal from '@/components/cricket/OpeningSelectionModal';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
@@ -33,6 +34,8 @@ const Umpire: React.FC = () => {
     showInningsBreak,
     setShowInningsBreak,
     resetMatch,
+    pendingOpeningSelection,
+    setOpeningPlayers,
   } = useMatch();
   const navigate = useNavigate();
   const [showShareModal, setShowShareModal] = useState(false);
@@ -101,6 +104,17 @@ const Umpire: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Opening Selection Modal */}
+      <OpeningSelectionModal
+        isOpen={pendingOpeningSelection}
+        onClose={() => {}}
+        onConfirm={setOpeningPlayers}
+        battingTeamPlayers={matchState.battingTeam.players}
+        bowlingTeamPlayers={matchState.bowlingTeam.players}
+        battingTeamName={matchState.battingTeam.name}
+        bowlingTeamName={matchState.bowlingTeam.name}
+      />
+
       {/* Wicket Modal */}
       <WicketModal
         isOpen={pendingWicket}

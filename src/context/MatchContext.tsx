@@ -37,6 +37,9 @@ interface MatchContextType {
   showInningsBreak: boolean;
   setShowInningsBreak: (value: boolean) => void;
   loadMatchState: (state: MatchState) => void;
+  pendingOpeningSelection: boolean;
+  setPendingOpeningSelection: (value: boolean) => void;
+  setOpeningPlayers: (striker: string, nonStriker: string, bowler: string) => void;
 }
 
 const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
@@ -113,6 +116,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [matchState, setMatchState] = useState<MatchState>(getDefaultMatchState());
   const [pendingWicket, setPendingWicket] = useState(false);
   const [pendingBowlerChange, setPendingBowlerChange] = useState(false);
+  const [pendingOpeningSelection, setPendingOpeningSelection] = useState(false);
   const [lastBowlerName, setLastBowlerName] = useState('');
   const [showInningsBreak, setShowInningsBreak] = useState(false);
 
@@ -532,11 +536,11 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const bowlingTeam = battingFirst === 'team1' ? team2 : team1;
 
     const openingBatters = [
-      createInitialBatter('1', battingTeam.players[0] || 'Batter 1', true),
-      createInitialBatter('2', battingTeam.players[1] || 'Batter 2', false),
+      createInitialBatter('1', 'Select Striker', true),
+      createInitialBatter('2', 'Select Non-Striker', false),
     ];
 
-    const openingBowler = createInitialBowler('1', bowlingTeam.players[0] || 'Bowler 1');
+    const openingBowler = createInitialBowler('1', 'Select Bowler');
 
     setMatchState({
       matchDetails: {
@@ -562,14 +566,42 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fallOfWickets: [],
       partnerships: [],
       currentPartnership: {
-        batter1: openingBatters[0].name,
-        batter2: openingBatters[1].name,
+        batter1: '',
+        batter2: '',
         runs: 0,
         balls: 0,
       },
       soundEnabled: true,
       vibrationEnabled: true,
     });
+
+    // Trigger opening selection modal
+    setPendingOpeningSelection(true);
+  }, []);
+
+  const setOpeningPlayers = useCallback((striker: string, nonStriker: string, bowler: string) => {
+    setMatchState(prev => {
+      const openingBatters = [
+        createInitialBatter('1', striker, true),
+        createInitialBatter('2', nonStriker, false),
+      ];
+      const openingBowler = createInitialBowler('1', bowler);
+
+      return {
+        ...prev,
+        batters: openingBatters,
+        allBatters: openingBatters,
+        currentBowler: openingBowler,
+        allBowlers: [openingBowler],
+        currentPartnership: {
+          batter1: striker,
+          batter2: nonStriker,
+          runs: 0,
+          balls: 0,
+        },
+      };
+    });
+    setPendingOpeningSelection(false);
   }, []);
 
   const toggleSound = useCallback(() => {
@@ -585,6 +617,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMatchState(getDefaultMatchState());
     setPendingWicket(false);
     setPendingBowlerChange(false);
+    setPendingOpeningSelection(false);
     setShowInningsBreak(false);
   }, []);
 
@@ -796,6 +829,9 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showInningsBreak,
         setShowInningsBreak,
         loadMatchState,
+        pendingOpeningSelection,
+        setPendingOpeningSelection,
+        setOpeningPlayers,
       }}
     >
       {children}
