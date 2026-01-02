@@ -18,6 +18,7 @@ interface OpeningSelectionModalProps {
   bowlingTeamPlayers: string[];
   battingTeamName: string;
   bowlingTeamName: string;
+  isSecondInnings?: boolean;
 }
 
 const OpeningSelectionModal: React.FC<OpeningSelectionModalProps> = ({
@@ -28,6 +29,7 @@ const OpeningSelectionModal: React.FC<OpeningSelectionModalProps> = ({
   bowlingTeamPlayers,
   battingTeamName,
   bowlingTeamName,
+  isSecondInnings = false,
 }) => {
   const [step, setStep] = useState<'striker' | 'nonStriker' | 'bowler'>('striker');
   const [striker, setStriker] = useState<string>('');
@@ -174,7 +176,7 @@ const OpeningSelectionModal: React.FC<OpeningSelectionModalProps> = ({
           )}
           {step === 'bowler' && bowler && (
             <Button onClick={handleConfirm} className="flex-1">
-              Start Match
+              {isSecondInnings ? 'Start 2nd Innings' : 'Start Match'}
             </Button>
           )}
         </div>

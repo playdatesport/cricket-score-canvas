@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2, Flag, Target } from 'lucide-react';
+import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2, Flag, Target, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CurrentOver from '@/components/cricket/CurrentOver';
 import ScoringControls from '@/components/cricket/ScoringControls';
@@ -11,6 +11,7 @@ import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
 import InningsBreakModal from '@/components/cricket/InningsBreakModal';
 import MatchResultModal from '@/components/cricket/MatchResultModal';
 import OpeningSelectionModal from '@/components/cricket/OpeningSelectionModal';
+import BatterChangeModal from '@/components/cricket/BatterChangeModal';
 import { toast } from '@/hooks/use-toast';
 
 const Umpire: React.FC = () => {
@@ -36,10 +37,13 @@ const Umpire: React.FC = () => {
     resetMatch,
     pendingOpeningSelection,
     setOpeningPlayers,
+    replaceBatter,
+    isSecondInningsSelection,
   } = useMatch();
   const navigate = useNavigate();
   const [showShareModal, setShowShareModal] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [showBatterChangeModal, setShowBatterChangeModal] = useState(false);
 
   // Redirect to setup if match not configured
   React.useEffect(() => {
@@ -113,6 +117,29 @@ const Umpire: React.FC = () => {
         bowlingTeamPlayers={matchState.bowlingTeam.players}
         battingTeamName={matchState.battingTeam.name}
         bowlingTeamName={matchState.bowlingTeam.name}
+        isSecondInnings={isSecondInningsSelection}
+      />
+
+      {/* Batter Change Modal */}
+      <BatterChangeModal
+        isOpen={showBatterChangeModal}
+        onClose={() => setShowBatterChangeModal(false)}
+        onConfirm={(outgoingId, newBatter, reason) => {
+          replaceBatter(outgoingId, newBatter, reason);
+          toast({
+            title: reason === 'retired_hurt' ? 'Batter Retired Hurt' : 'Batter Substituted',
+            description: `${newBatter} is now at the crease`,
+          });
+        }}
+        currentBatters={matchState.batters.filter(b => !b.isOut).map(b => ({
+          id: b.id,
+          name: b.name,
+          isOnStrike: b.isOnStrike,
+          runs: b.runs,
+          balls: b.balls,
+        }))}
+        availableBatters={availableBatters}
+        battingTeamName={matchState.battingTeam.name}
       />
 
       {/* Wicket Modal */}
@@ -288,14 +315,25 @@ const Umpire: React.FC = () => {
               </div>
             ))}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full mt-2 text-primary text-xs sm:text-sm h-8 sm:h-9"
-            onClick={changeStriker}
-          >
-            Swap Striker
-          </Button>
+          <div className="flex gap-2 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 text-primary text-xs sm:text-sm h-8 sm:h-9"
+              onClick={changeStriker}
+            >
+              Swap Striker
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 text-orange-500 text-xs sm:text-sm h-8 sm:h-9"
+              onClick={() => setShowBatterChangeModal(true)}
+            >
+              <UserMinus className="w-3.5 h-3.5 mr-1" />
+              Change Batter
+            </Button>
+          </div>
         </div>
 
         {/* Current Bowler */}
