@@ -40,6 +40,8 @@ interface MatchContextType {
   pendingOpeningSelection: boolean;
   setPendingOpeningSelection: (value: boolean) => void;
   setOpeningPlayers: (striker: string, nonStriker: string, bowler: string) => void;
+  replaceBatter: (outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution') => void;
+  isSecondInningsSelection: boolean;
 }
 
 const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
@@ -117,6 +119,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [pendingWicket, setPendingWicket] = useState(false);
   const [pendingBowlerChange, setPendingBowlerChange] = useState(false);
   const [pendingOpeningSelection, setPendingOpeningSelection] = useState(false);
+  const [isSecondInningsSelection, setIsSecondInningsSelection] = useState(false);
   const [lastBowlerName, setLastBowlerName] = useState('');
   const [showInningsBreak, setShowInningsBreak] = useState(false);
 
@@ -602,6 +605,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
     });
     setPendingOpeningSelection(false);
+    setIsSecondInningsSelection(false);
   }, []);
 
   const toggleSound = useCallback(() => {
@@ -618,6 +622,7 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPendingWicket(false);
     setPendingBowlerChange(false);
     setPendingOpeningSelection(false);
+    setIsSecondInningsSelection(false);
     setShowInningsBreak(false);
   }, []);
 
@@ -704,14 +709,13 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         target: undefined,
       };
 
-      // Create opening batters for second innings
+      // Create placeholder batters and bowler - will be replaced by opening selection
       const openingBatters = [
-        createInitialBatter('s1', newBattingTeam.players[0] || 'Batter 1', true),
-        createInitialBatter('s2', newBattingTeam.players[1] || 'Batter 2', false),
+        createInitialBatter('s1', 'Select Striker', true),
+        createInitialBatter('s2', 'Select Non-Striker', false),
       ];
 
-      // Create opening bowler for second innings
-      const openingBowler = createInitialBowler('s1', newBowlingTeam.players[0] || 'Bowler 1');
+      const openingBowler = createInitialBowler('s1', 'Select Bowler');
 
       return {
         ...prev,
@@ -728,8 +732,8 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         fallOfWickets: [],
         partnerships: [],
         currentPartnership: {
-          batter1: openingBatters[0].name,
-          batter2: openingBatters[1].name,
+          batter1: '',
+          batter2: '',
           runs: 0,
           balls: 0,
         },
@@ -738,8 +742,50 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
     
     setShowInningsBreak(false);
-    setPendingBowlerChange(true);
+    setIsSecondInningsSelection(true);
+    setPendingOpeningSelection(true);
     setLastBowlerName('');
+  }, []);
+
+  const replaceBatter = useCallback((outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution') => {
+    setMatchState(prev => {
+      const outgoingBatter = prev.batters.find(b => b.id === outgoingBatterId);
+      if (!outgoingBatter) return prev;
+
+      // Mark the outgoing batter with the reason
+      const updatedOutgoingBatter: Batter = {
+        ...outgoingBatter,
+        isOut: reason === 'substitution', // Retired hurt can come back
+        dismissalType: reason === 'retired_hurt' ? 'retired hurt' : undefined,
+      };
+
+      // Create the new batter
+      const newBatter = createInitialBatter(`${Date.now()}`, newBatterName, outgoingBatter.isOnStrike);
+
+      // Update batters array
+      const newBatters = prev.batters.map(b => 
+        b.id === outgoingBatterId ? newBatter : b
+      );
+
+      // Update allBatters
+      const updatedAllBatters = prev.allBatters.map(ab => 
+        ab.id === outgoingBatterId ? updatedOutgoingBatter : ab
+      );
+
+      // Update partnership
+      const newPartnership = {
+        ...prev.currentPartnership,
+        batter1: prev.currentPartnership.batter1 === outgoingBatter.name ? newBatterName : prev.currentPartnership.batter1,
+        batter2: prev.currentPartnership.batter2 === outgoingBatter.name ? newBatterName : prev.currentPartnership.batter2,
+      };
+
+      return {
+        ...prev,
+        batters: newBatters,
+        allBatters: [...updatedAllBatters, newBatter],
+        currentPartnership: newPartnership,
+      };
+    });
   }, []);
 
   // Check for match completion after each ball in second innings
@@ -832,6 +878,8 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pendingOpeningSelection,
         setPendingOpeningSelection,
         setOpeningPlayers,
+        replaceBatter,
+        isSecondInningsSelection,
       }}
     >
       {children}
