@@ -13,6 +13,15 @@ interface WicketDetails {
   runOutBy?: string;
 }
 
+interface RetiredHurtBatter {
+  id: string;
+  name: string;
+  runs: number;
+  balls: number;
+  fours: number;
+  sixes: number;
+}
+
 interface MatchContextType {
   matchState: MatchState;
   addBall: (outcome: BallOutcome) => void;
@@ -40,8 +49,11 @@ interface MatchContextType {
   pendingOpeningSelection: boolean;
   setPendingOpeningSelection: (value: boolean) => void;
   setOpeningPlayers: (striker: string, nonStriker: string, bowler: string) => void;
-  replaceBatter: (outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution') => void;
+  replaceBatter: (outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution' | 'impact_player') => void;
+  returnRetiredHurtBatter: (retiredBatterId: string, outgoingBatterId: string) => void;
   isSecondInningsSelection: boolean;
+  retiredHurtBatters: RetiredHurtBatter[];
+  isImpactPlayerUsed: boolean;
 }
 
 const createInitialBatter = (id: string, name: string, isOnStrike: boolean): Batter => ({
@@ -122,6 +134,8 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSecondInningsSelection, setIsSecondInningsSelection] = useState(false);
   const [lastBowlerName, setLastBowlerName] = useState('');
   const [showInningsBreak, setShowInningsBreak] = useState(false);
+  const [retiredHurtBatters, setRetiredHurtBatters] = useState<RetiredHurtBatter[]>([]);
+  const [isImpactPlayerUsed, setIsImpactPlayerUsed] = useState(false);
 
   const getSoundType = (outcome: BallOutcome) => {
     if (outcome === 'W') return 'wicket';
@@ -624,6 +638,8 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPendingOpeningSelection(false);
     setIsSecondInningsSelection(false);
     setShowInningsBreak(false);
+    setRetiredHurtBatters([]);
+    setIsImpactPlayerUsed(false);
   }, []);
 
   const getMatchResult = useCallback((battingScore: number, battingWickets: number, target: number, bowlingTeamName: string, battingTeamName: string, remainingBalls: number): MatchResult => {
@@ -747,15 +763,32 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLastBowlerName('');
   }, []);
 
-  const replaceBatter = useCallback((outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution') => {
+  const replaceBatter = useCallback((outgoingBatterId: string, newBatterName: string, reason: 'retired_hurt' | 'substitution' | 'impact_player') => {
     setMatchState(prev => {
       const outgoingBatter = prev.batters.find(b => b.id === outgoingBatterId);
       if (!outgoingBatter) return prev;
 
+      // If retired hurt, add to retired hurt list
+      if (reason === 'retired_hurt') {
+        setRetiredHurtBatters(current => [...current, {
+          id: outgoingBatter.id,
+          name: outgoingBatter.name,
+          runs: outgoingBatter.runs,
+          balls: outgoingBatter.balls,
+          fours: outgoingBatter.fours,
+          sixes: outgoingBatter.sixes,
+        }]);
+      }
+
+      // If impact player, mark as used
+      if (reason === 'impact_player') {
+        setIsImpactPlayerUsed(true);
+      }
+
       // Mark the outgoing batter with the reason
       const updatedOutgoingBatter: Batter = {
         ...outgoingBatter,
-        isOut: reason === 'substitution', // Retired hurt can come back
+        isOut: reason !== 'retired_hurt', // Retired hurt can come back
         dismissalType: reason === 'retired_hurt' ? 'retired hurt' : undefined,
       };
 
@@ -787,6 +820,62 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
     });
   }, []);
+
+  const returnRetiredHurtBatter = useCallback((retiredBatterId: string, outgoingBatterId: string) => {
+    const retiredBatter = retiredHurtBatters.find(b => b.id === retiredBatterId);
+    if (!retiredBatter) return;
+
+    setMatchState(prev => {
+      const outgoingBatter = prev.batters.find(b => b.id === outgoingBatterId);
+      if (!outgoingBatter) return prev;
+
+      // Create returning batter with their previous stats
+      const returningBatter: Batter = {
+        id: retiredBatter.id,
+        name: retiredBatter.name,
+        runs: retiredBatter.runs,
+        balls: retiredBatter.balls,
+        fours: retiredBatter.fours,
+        sixes: retiredBatter.sixes,
+        isOnStrike: outgoingBatter.isOnStrike,
+        isOut: false,
+      };
+
+      // The outgoing batter goes to retired hurt
+      setRetiredHurtBatters(current => [
+        ...current.filter(b => b.id !== retiredBatterId),
+        {
+          id: outgoingBatter.id,
+          name: outgoingBatter.name,
+          runs: outgoingBatter.runs,
+          balls: outgoingBatter.balls,
+          fours: outgoingBatter.fours,
+          sixes: outgoingBatter.sixes,
+        }
+      ]);
+
+      // Update batters array
+      const newBatters = prev.batters.map(b => 
+        b.id === outgoingBatterId ? returningBatter : b
+      );
+
+      // Update partnership
+      const newPartnership = {
+        ...prev.currentPartnership,
+        batter1: prev.currentPartnership.batter1 === outgoingBatter.name ? returningBatter.name : prev.currentPartnership.batter1,
+        batter2: prev.currentPartnership.batter2 === outgoingBatter.name ? returningBatter.name : prev.currentPartnership.batter2,
+      };
+
+      return {
+        ...prev,
+        batters: newBatters,
+        currentPartnership: newPartnership,
+      };
+    });
+
+    // Remove returned batter from retired hurt list
+    setRetiredHurtBatters(current => current.filter(b => b.id !== retiredBatterId));
+  }, [retiredHurtBatters]);
 
   // Check for match completion after each ball in second innings
   const checkMatchCompletion = useCallback((state: MatchState): MatchState => {
@@ -879,7 +968,10 @@ export const MatchProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setPendingOpeningSelection,
         setOpeningPlayers,
         replaceBatter,
+        returnRetiredHurtBatter,
         isSecondInningsSelection,
+        retiredHurtBatters,
+        isImpactPlayerUsed,
       }}
     >
       {children}

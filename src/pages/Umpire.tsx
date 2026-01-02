@@ -38,7 +38,10 @@ const Umpire: React.FC = () => {
     pendingOpeningSelection,
     setOpeningPlayers,
     replaceBatter,
+    returnRetiredHurtBatter,
     isSecondInningsSelection,
+    retiredHurtBatters,
+    isImpactPlayerUsed,
   } = useMatch();
   const navigate = useNavigate();
   const [showShareModal, setShowShareModal] = useState(false);
@@ -127,8 +130,16 @@ const Umpire: React.FC = () => {
         onConfirm={(outgoingId, newBatter, reason) => {
           replaceBatter(outgoingId, newBatter, reason);
           toast({
-            title: reason === 'retired_hurt' ? 'Batter Retired Hurt' : 'Batter Substituted',
+            title: reason === 'retired_hurt' ? 'Batter Retired Hurt' : reason === 'impact_player' ? 'Impact Player Substituted' : 'Batter Substituted',
             description: `${newBatter} is now at the crease`,
+          });
+        }}
+        onReturnRetiredHurt={(retiredId, outgoingId) => {
+          returnRetiredHurtBatter(retiredId, outgoingId);
+          const returningBatter = retiredHurtBatters.find(b => b.id === retiredId);
+          toast({
+            title: 'Retired Hurt Batter Returned',
+            description: `${returningBatter?.name || 'Batter'} is back at the crease`,
           });
         }}
         currentBatters={matchState.batters.filter(b => !b.isOut).map(b => ({
@@ -140,6 +151,9 @@ const Umpire: React.FC = () => {
         }))}
         availableBatters={availableBatters}
         battingTeamName={matchState.battingTeam.name}
+        retiredHurtBatters={retiredHurtBatters}
+        currentOvers={matchState.battingTeam.overs}
+        isImpactPlayerUsed={isImpactPlayerUsed}
       />
 
       {/* Wicket Modal */}
