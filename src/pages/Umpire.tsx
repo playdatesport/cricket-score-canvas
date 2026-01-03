@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Radio, Volume2, VolumeX, Smartphone, FileText, BarChart3, Share2, Flag, Target, UserMinus } from 'lucide-react';
@@ -13,6 +13,33 @@ import MatchResultModal from '@/components/cricket/MatchResultModal';
 import OpeningSelectionModal from '@/components/cricket/OpeningSelectionModal';
 import BatterChangeModal from '@/components/cricket/BatterChangeModal';
 import { toast } from '@/hooks/use-toast';
+
+// Memoized batter display component
+const BatterDisplay = memo<{
+  id: string;
+  name: string;
+  runs: number;
+  balls: number;
+  isOnStrike: boolean;
+}>(({ name, runs, balls, isOnStrike }) => (
+  <div
+    className={`flex-1 flex items-center justify-between px-2.5 sm:px-3 py-2 rounded-lg ${
+      isOnStrike ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
+    }`}
+  >
+    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+      <span className="font-medium text-foreground text-xs sm:text-sm truncate">{name}</span>
+      {isOnStrike && (
+        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+      )}
+    </div>
+    <div className="text-right flex-shrink-0">
+      <span className="text-base sm:text-lg font-bold text-foreground">{runs}</span>
+      <span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5 sm:ml-1">({balls})</span>
+    </div>
+  </div>
+));
+BatterDisplay.displayName = 'BatterDisplay';
 
 const Umpire: React.FC = () => {
   const { 
@@ -49,32 +76,33 @@ const Umpire: React.FC = () => {
   const [showBatterChangeModal, setShowBatterChangeModal] = useState(false);
 
   // Redirect to setup if match not configured
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isMatchSetup) {
       navigate('/setup');
     }
   }, [isMatchSetup, navigate]);
 
   // Show result modal when match completes
-  React.useEffect(() => {
+  useEffect(() => {
     if (matchState.matchStatus === 'completed' && matchState.matchResult) {
       setShowResultModal(true);
     }
   }, [matchState.matchStatus, matchState.matchResult]);
 
-  const handleUndo = () => {
+  // Memoized handlers
+  const handleUndo = useCallback(() => {
     undoLastBall();
     toast({
       title: "Ball undone",
       description: "Last ball has been removed",
     });
-  };
+  }, [undoLastBall]);
 
-  const handleChangeBowler = () => {
+  const handleChangeBowler = useCallback(() => {
     setPendingBowlerChange(true);
-  };
+  }, [setPendingBowlerChange]);
 
-  const handleEndInnings = () => {
+  const handleEndInnings = useCallback(() => {
     endInnings();
     toast({
       title: matchState.isFirstInnings ? "First innings ended" : "Match completed",
@@ -82,28 +110,88 @@ const Umpire: React.FC = () => {
         ? `Target: ${matchState.battingTeam.score + 1} runs` 
         : "View the full scorecard for details",
     });
-  };
+  }, [endInnings, matchState.isFirstInnings, matchState.battingTeam.score]);
 
-  const handleNewMatch = () => {
+  const handleNewMatch = useCallback(() => {
     resetMatch();
     navigate('/setup');
-  };
+  }, [resetMatch, navigate]);
 
-  // Get available batters (those who haven't batted yet)
-  const battedPlayers = matchState.allBatters.map(b => b.name);
-  const availableBatters = matchState.battingTeam.players.filter(
-    p => p.trim() && !battedPlayers.includes(p)
+  const handleViewScorecard = useCallback(() => {
+    setShowResultModal(false);
+    navigate('/scorecard');
+  }, [navigate]);
+
+  const handleOpenShare = useCallback(() => setShowShareModal(true), []);
+  const handleCloseShare = useCallback(() => setShowShareModal(false), []);
+  const handleCloseResult = useCallback(() => setShowResultModal(false), []);
+  const handleOpenBatterChange = useCallback(() => setShowBatterChangeModal(true), []);
+  const handleCloseBatterChange = useCallback(() => setShowBatterChangeModal(false), []);
+
+  const handleBatterChange = useCallback((outgoingId: string, newBatter: string, reason: 'retired_hurt' | 'substitution' | 'impact_player') => {
+    replaceBatter(outgoingId, newBatter, reason);
+    toast({
+      title: reason === 'retired_hurt' ? 'Batter Retired Hurt' : reason === 'impact_player' ? 'Impact Player Substituted' : 'Batter Substituted',
+      description: `${newBatter} is now at the crease`,
+    });
+  }, [replaceBatter]);
+
+  const handleReturnRetiredHurt = useCallback((retiredId: string, outgoingId: string) => {
+    returnRetiredHurtBatter(retiredId, outgoingId);
+    const returningBatter = retiredHurtBatters.find(b => b.id === retiredId);
+    toast({
+      title: 'Retired Hurt Batter Returned',
+      description: `${returningBatter?.name || 'Batter'} is back at the crease`,
+    });
+  }, [returnRetiredHurtBatter, retiredHurtBatters]);
+
+  // Memoized derived state
+  const availableBatters = useMemo(() => {
+    const battedPlayers = matchState.allBatters.map(b => b.name);
+    return matchState.battingTeam.players.filter(
+      p => p.trim() && !battedPlayers.includes(p)
+    );
+  }, [matchState.allBatters, matchState.battingTeam.players]);
+
+  const outgoingBatter = useMemo(() => 
+    matchState.batters.find(b => b.isOnStrike)?.name || '',
+    [matchState.batters]
   );
 
-  const outgoingBatter = matchState.batters.find(b => b.isOnStrike)?.name || '';
+  const currentBattersForModal = useMemo(() => 
+    matchState.batters.filter(b => !b.isOut).map(b => ({
+      id: b.id,
+      name: b.name,
+      isOnStrike: b.isOnStrike,
+      runs: b.runs,
+      balls: b.balls,
+    })),
+    [matchState.batters]
+  );
 
-  // Calculate required info for second innings
-  const target = matchState.battingTeam.target;
-  const runsNeeded = target ? target - matchState.battingTeam.score : 0;
-  const totalBalls = matchState.matchDetails.totalOvers * 6;
-  const ballsBowled = matchState.battingTeam.overs * 6 + matchState.battingTeam.balls;
-  const ballsRemaining = totalBalls - ballsBowled;
-  const requiredRate = ballsRemaining > 0 ? (runsNeeded / ballsRemaining) * 6 : 0;
+  const activeBatters = useMemo(() => 
+    matchState.batters.filter(b => !b.isOut),
+    [matchState.batters]
+  );
+
+  const targetInfo = useMemo(() => {
+    const target = matchState.battingTeam.target;
+    if (!target) return null;
+    
+    const runsNeeded = target - matchState.battingTeam.score;
+    const totalBalls = matchState.matchDetails.totalOvers * 6;
+    const ballsBowled = matchState.battingTeam.overs * 6 + matchState.battingTeam.balls;
+    const ballsRemaining = totalBalls - ballsBowled;
+    const requiredRate = ballsRemaining > 0 ? (runsNeeded / ballsRemaining) * 6 : 0;
+    
+    return { target, runsNeeded, ballsRemaining, requiredRate };
+  }, [
+    matchState.battingTeam.target,
+    matchState.battingTeam.score,
+    matchState.battingTeam.overs,
+    matchState.battingTeam.balls,
+    matchState.matchDetails.totalOvers,
+  ]);
 
   if (!isMatchSetup) {
     return null;
@@ -126,29 +214,10 @@ const Umpire: React.FC = () => {
       {/* Batter Change Modal */}
       <BatterChangeModal
         isOpen={showBatterChangeModal}
-        onClose={() => setShowBatterChangeModal(false)}
-        onConfirm={(outgoingId, newBatter, reason) => {
-          replaceBatter(outgoingId, newBatter, reason);
-          toast({
-            title: reason === 'retired_hurt' ? 'Batter Retired Hurt' : reason === 'impact_player' ? 'Impact Player Substituted' : 'Batter Substituted',
-            description: `${newBatter} is now at the crease`,
-          });
-        }}
-        onReturnRetiredHurt={(retiredId, outgoingId) => {
-          returnRetiredHurtBatter(retiredId, outgoingId);
-          const returningBatter = retiredHurtBatters.find(b => b.id === retiredId);
-          toast({
-            title: 'Retired Hurt Batter Returned',
-            description: `${returningBatter?.name || 'Batter'} is back at the crease`,
-          });
-        }}
-        currentBatters={matchState.batters.filter(b => !b.isOut).map(b => ({
-          id: b.id,
-          name: b.name,
-          isOnStrike: b.isOnStrike,
-          runs: b.runs,
-          balls: b.balls,
-        }))}
+        onClose={handleCloseBatterChange}
+        onConfirm={handleBatterChange}
+        onReturnRetiredHurt={handleReturnRetiredHurt}
+        currentBatters={currentBattersForModal}
         availableBatters={availableBatters}
         battingTeamName={matchState.battingTeam.name}
         retiredHurtBatters={retiredHurtBatters}
@@ -181,7 +250,7 @@ const Umpire: React.FC = () => {
       {/* Share Modal */}
       <ShareScorecardModal
         isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
+        onClose={handleCloseShare}
         matchState={matchState}
       />
 
@@ -202,13 +271,10 @@ const Umpire: React.FC = () => {
       {matchState.matchResult && (
         <MatchResultModal
           isOpen={showResultModal}
-          onClose={() => setShowResultModal(false)}
+          onClose={handleCloseResult}
           result={matchState.matchResult}
           onNewMatch={handleNewMatch}
-          onViewScorecard={() => {
-            setShowResultModal(false);
-            navigate('/scorecard');
-          }}
+          onViewScorecard={handleViewScorecard}
         />
       )}
 
@@ -230,7 +296,7 @@ const Umpire: React.FC = () => {
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1">
             <button
-              onClick={() => setShowShareModal(true)}
+              onClick={handleOpenShare}
               className="p-1.5 sm:p-2 rounded-full transition-colors text-muted-foreground hover:text-primary"
             >
               <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -256,23 +322,23 @@ const Umpire: React.FC = () => {
       </div>
 
       {/* Target Display (Second Innings Only) */}
-      {!matchState.isFirstInnings && target && (
+      {!matchState.isFirstInnings && targetInfo && (
         <div className="mx-3 sm:mx-4 mt-3 bg-primary/10 border border-primary/30 rounded-xl p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Target className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium text-foreground">Target: {target}</span>
+              <span className="text-sm font-medium text-foreground">Target: {targetInfo.target}</span>
             </div>
             <div className="text-right">
-              <span className="text-lg font-bold text-primary">{runsNeeded}</span>
+              <span className="text-lg font-bold text-primary">{targetInfo.runsNeeded}</span>
               <span className="text-xs text-muted-foreground ml-1">needed from</span>
-              <span className="text-lg font-bold text-foreground ml-1">{ballsRemaining}</span>
+              <span className="text-lg font-bold text-foreground ml-1">{targetInfo.ballsRemaining}</span>
               <span className="text-xs text-muted-foreground ml-1">balls</span>
             </div>
           </div>
           <div className="mt-2 flex justify-end">
             <span className="text-xs text-muted-foreground">
-              RRR: <span className="font-semibold text-foreground">{requiredRate.toFixed(2)}</span>
+              RRR: <span className="font-semibold text-foreground">{targetInfo.requiredRate.toFixed(2)}</span>
             </span>
           </div>
         </div>
@@ -309,24 +375,15 @@ const Umpire: React.FC = () => {
         {/* Current Batters */}
         <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
           <div className="flex flex-col sm:flex-row gap-2">
-            {matchState.batters.filter(b => !b.isOut).map((batter) => (
-              <div
+            {activeBatters.map((batter) => (
+              <BatterDisplay
                 key={batter.id}
-                className={`flex-1 flex items-center justify-between px-2.5 sm:px-3 py-2 rounded-lg ${
-                  batter.isOnStrike ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-                  <span className="font-medium text-foreground text-xs sm:text-sm truncate">{batter.name}</span>
-                  {batter.isOnStrike && (
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
-                  )}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="text-base sm:text-lg font-bold text-foreground">{batter.runs}</span>
-                  <span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5 sm:ml-1">({batter.balls})</span>
-                </div>
-              </div>
+                id={batter.id}
+                name={batter.name}
+                runs={batter.runs}
+                balls={batter.balls}
+                isOnStrike={batter.isOnStrike}
+              />
             ))}
           </div>
           <div className="flex gap-2 mt-2">
@@ -342,7 +399,7 @@ const Umpire: React.FC = () => {
               variant="ghost"
               size="sm"
               className="flex-1 text-orange-500 text-xs sm:text-sm h-8 sm:h-9"
-              onClick={() => setShowBatterChangeModal(true)}
+              onClick={handleOpenBatterChange}
             >
               <UserMinus className="w-3.5 h-3.5 mr-1" />
               Change Batter
