@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useMatch } from '@/context/MatchContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Radio, Plus, FileText, BarChart3, Share2, Zap, Trophy, Target, TrendingUp, Clock, History } from 'lucide-react';
+import { Radio, Plus, FileText, BarChart3, Share2, Zap, Trophy, Target, TrendingUp, History, LucideIcon } from 'lucide-react';
 import BatterStats from '@/components/cricket/BatterStats';
 import BowlerStats from '@/components/cricket/BowlerStats';
 import CurrentOver from '@/components/cricket/CurrentOver';
@@ -10,6 +10,33 @@ import ShareScorecardModal from '@/components/cricket/ShareScorecardModal';
 import MatchHistoryList from '@/components/cricket/MatchHistoryList';
 import { useMatchHistory } from '@/hooks/useMatchHistory';
 import { toast } from 'sonner';
+
+// Memoized feature card component
+const FeatureCard = memo<{
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  color: string;
+  delay: number;
+}>(({ icon: Icon, title, desc, color, delay }) => (
+  <div
+    className="bg-card/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl shadow-card border border-border/50 hover-lift cursor-default"
+    style={{ animationDelay: `${delay}s` }}
+  >
+    <Icon className={`w-7 h-7 ${color} mb-3`} />
+    <h3 className="font-bold text-sm sm:text-base text-foreground">{title}</h3>
+    <p className="text-xs sm:text-sm text-muted-foreground mt-1">{desc}</p>
+  </div>
+));
+FeatureCard.displayName = 'FeatureCard';
+
+// Static features data - defined outside component to prevent recreation
+const FEATURES = [
+  { icon: Zap, title: 'Live Stats', desc: 'Real-time updates', color: 'text-warning' },
+  { icon: Trophy, title: 'Full Scorecard', desc: 'Detailed records', color: 'text-success' },
+  { icon: Target, title: 'Analytics', desc: 'Wagon wheel & charts', color: 'text-primary' },
+  { icon: TrendingUp, title: 'Share', desc: 'Export & share', color: 'text-cricket-purple' },
+] as const;
 
 const Index: React.FC = () => {
   const { matchState, isMatchSetup, loadMatchState } = useMatch();
@@ -23,7 +50,7 @@ const Index: React.FC = () => {
     if (isMatchSetup && matchState.matchStatus !== 'setup') {
       const saveTimer = setTimeout(() => {
         saveMatch(matchState);
-      }, 2000); // Debounce saves
+      }, 2000);
       return () => clearTimeout(saveTimer);
     }
   }, [matchState, isMatchSetup, saveMatch]);
@@ -44,23 +71,45 @@ const Index: React.FC = () => {
     await deleteMatch(matchId);
   }, [deleteMatch]);
 
-  // Calculate stats
-  const runRate = matchState.battingTeam.overs > 0 || matchState.battingTeam.balls > 0
-    ? (matchState.battingTeam.score / (matchState.battingTeam.overs + matchState.battingTeam.balls / 6)).toFixed(2)
-    : '0.00';
+  const handleNewMatch = useCallback(() => {
+    clearCurrentMatch();
+    navigate('/setup');
+  }, [clearCurrentMatch, navigate]);
 
-  const target = matchState.battingTeam.target;
-  const runsNeeded = target ? target - matchState.battingTeam.score : 0;
-  const totalBalls = matchState.matchDetails.totalOvers * 6;
-  const ballsBowled = matchState.battingTeam.overs * 6 + matchState.battingTeam.balls;
-  const ballsRemaining = totalBalls - ballsBowled;
-  const requiredRate = ballsRemaining > 0 ? ((runsNeeded / ballsRemaining) * 6).toFixed(2) : '0.00';
+  const handleToggleHistory = useCallback(() => {
+    fetchMatches();
+    setShowHistory(prev => !prev);
+  }, [fetchMatches]);
+
+  const handleOpenShare = useCallback(() => setShowShareModal(true), []);
+  const handleCloseShare = useCallback(() => setShowShareModal(false), []);
+
+  // Memoized calculations
+  const stats = useMemo(() => {
+    const overs = matchState.battingTeam.overs + matchState.battingTeam.balls / 6;
+    const runRate = overs > 0 ? (matchState.battingTeam.score / overs).toFixed(2) : '0.00';
+    
+    const target = matchState.battingTeam.target;
+    const runsNeeded = target ? target - matchState.battingTeam.score : 0;
+    const totalBalls = matchState.matchDetails.totalOvers * 6;
+    const ballsBowled = matchState.battingTeam.overs * 6 + matchState.battingTeam.balls;
+    const ballsRemaining = totalBalls - ballsBowled;
+    const requiredRate = ballsRemaining > 0 ? ((runsNeeded / ballsRemaining) * 6).toFixed(2) : '0.00';
+    const projected = Math.round(parseFloat(runRate) * matchState.matchDetails.totalOvers);
+
+    return { runRate, target, runsNeeded, ballsRemaining, requiredRate, projected };
+  }, [
+    matchState.battingTeam.overs,
+    matchState.battingTeam.balls,
+    matchState.battingTeam.score,
+    matchState.battingTeam.target,
+    matchState.matchDetails.totalOvers,
+  ]);
 
   // Show welcome screen if no match is setup
   if (!isMatchSetup) {
     return (
       <div className="min-h-screen bg-background gradient-hero">
-        {/* Hero Section */}
         <div className="relative overflow-hidden">
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-5">
@@ -90,10 +139,7 @@ const Index: React.FC = () => {
             {/* CTA Buttons */}
             <div className="w-full max-w-sm mb-8 animate-slide-up space-y-3" style={{ animationDelay: '0.1s' }}>
               <Button
-                onClick={() => {
-                  clearCurrentMatch();
-                  navigate('/setup');
-                }}
+                onClick={handleNewMatch}
                 className="w-full h-14 sm:h-16 text-lg sm:text-xl font-bold gap-3 gradient-primary shadow-glow hover:shadow-lg transition-all duration-300 rounded-2xl"
               >
                 <Plus className="w-6 h-6" />
@@ -102,10 +148,7 @@ const Index: React.FC = () => {
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    fetchMatches();
-                    setShowHistory(!showHistory);
-                  }}
+                  onClick={handleToggleHistory}
                   className="flex-1 h-12 text-sm font-semibold gap-2 rounded-xl hover-lift"
                 >
                   <History className="w-4 h-4" />
@@ -144,21 +187,15 @@ const Index: React.FC = () => {
             {!showHistory && (
               <div className="w-full max-w-lg animate-slide-up" style={{ animationDelay: '0.2s' }}>
                 <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { icon: Zap, title: 'Live Stats', desc: 'Real-time updates', color: 'text-warning' },
-                    { icon: Trophy, title: 'Full Scorecard', desc: 'Detailed records', color: 'text-success' },
-                    { icon: Target, title: 'Analytics', desc: 'Wagon wheel & charts', color: 'text-primary' },
-                    { icon: TrendingUp, title: 'Share', desc: 'Export & share', color: 'text-cricket-purple' },
-                  ].map((feature, idx) => (
-                    <div
+                  {FEATURES.map((feature, idx) => (
+                    <FeatureCard
                       key={feature.title}
-                      className="bg-card/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl shadow-card border border-border/50 hover-lift cursor-default"
-                      style={{ animationDelay: `${0.3 + idx * 0.1}s` }}
-                    >
-                      <feature.icon className={`w-7 h-7 ${feature.color} mb-3`} />
-                      <h3 className="font-bold text-sm sm:text-base text-foreground">{feature.title}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">{feature.desc}</p>
-                    </div>
+                      icon={feature.icon}
+                      title={feature.title}
+                      desc={feature.desc}
+                      color={feature.color}
+                      delay={0.3 + idx * 0.1}
+                    />
                   ))}
                 </div>
               </div>
@@ -179,7 +216,7 @@ const Index: React.FC = () => {
       {/* Share Modal */}
       <ShareScorecardModal
         isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
+        onClose={handleCloseShare}
         matchState={matchState}
       />
 
@@ -197,14 +234,12 @@ const Index: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="p-2 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={handleOpenShare}
+              className="p-2 rounded-full bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Match Type & Venue */}
@@ -259,9 +294,9 @@ const Index: React.FC = () => {
                     : matchState.firstInningsData?.battingTeam.wickets || 0}
                 </span>
               </div>
-              {!matchState.isFirstInnings && target && (
+              {!matchState.isFirstInnings && stats.target && (
                 <p className="text-sm font-semibold mt-1 opacity-80">
-                  Target: {target}
+                  Target: {stats.target}
                 </p>
               )}
             </div>
@@ -272,19 +307,19 @@ const Index: React.FC = () => {
         <div className="flex justify-center gap-6 px-4 py-3 bg-primary-foreground/10">
           <div className="text-center">
             <p className="text-[10px] uppercase opacity-60">CRR</p>
-            <p className="text-sm font-bold">{runRate}</p>
+            <p className="text-sm font-bold">{stats.runRate}</p>
           </div>
-          {!matchState.isFirstInnings && target && (
+          {!matchState.isFirstInnings && stats.target && (
             <>
               <div className="w-px h-8 bg-primary-foreground/20" />
               <div className="text-center">
                 <p className="text-[10px] uppercase opacity-60">RRR</p>
-                <p className="text-sm font-bold">{requiredRate}</p>
+                <p className="text-sm font-bold">{stats.requiredRate}</p>
               </div>
               <div className="w-px h-8 bg-primary-foreground/20" />
               <div className="text-center">
                 <p className="text-[10px] uppercase opacity-60">Need</p>
-                <p className="text-sm font-bold">{runsNeeded} ({ballsRemaining})</p>
+                <p className="text-sm font-bold">{stats.runsNeeded} ({stats.ballsRemaining})</p>
               </div>
             </>
           )}
@@ -293,9 +328,7 @@ const Index: React.FC = () => {
               <div className="w-px h-8 bg-primary-foreground/20" />
               <div className="text-center">
                 <p className="text-[10px] uppercase opacity-60">Projected</p>
-                <p className="text-sm font-bold">
-                  {Math.round(parseFloat(runRate) * matchState.matchDetails.totalOvers)}
-                </p>
+                <p className="text-sm font-bold">{stats.projected}</p>
               </div>
             </>
           )}
