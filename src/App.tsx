@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { MatchProvider } from "./context/MatchContext";
 import InstallPrompt from "./components/InstallPrompt";
+import OfflineIndicator from "./components/OfflineIndicator";
 
 // Eagerly loaded routes (critical path)
 import Index from "./pages/Index";
@@ -56,6 +57,7 @@ const App = () => (
             </Routes>
           </Suspense>
           <InstallPrompt />
+          <OfflineIndicator />
         </BrowserRouter>
       </MatchProvider>
     </TooltipProvider>
