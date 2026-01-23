@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import AvatarPicker from '@/components/cricket/AvatarPicker';
+import ThemeToggle from '@/components/ThemeToggle';
 import { ArrowLeft, ArrowRight, Check, Home, Trophy, Users, Calendar, Coins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -136,7 +137,7 @@ const MatchSetup = () => {
             <Home className="w-5 h-5" />
           </Link>
           <h1 className="font-semibold text-lg">New Match</h1>
-          <div className="w-5" />
+          <ThemeToggle className="rounded-full" />
         </div>
       </div>
 

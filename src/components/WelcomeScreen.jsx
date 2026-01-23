@@ -6,6 +6,7 @@ import {
   Trophy, History, BarChart3, Plus, ChevronRight,
   Target, TrendingUp, Zap, Users
 } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const FeatureCard = memo(({ icon: Icon, title, description, color, delay }) => (
   <div 
@@ -59,6 +60,11 @@ const WelcomeScreen = ({ onNewMatch, onShowHistory, onNavigateStats, matchCount 
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Theme Toggle - Top Right */}
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle className="bg-card/80 backdrop-blur-sm border border-border shadow-soft" />
+      </div>
+
       {/* Hero Section */}
       <div className="gradient-hero pt-12 pb-8 px-4">
         <div className="max-w-md mx-auto text-center">
