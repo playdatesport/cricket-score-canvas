@@ -17,6 +17,7 @@ import {
   ClipboardList, Activity, SkipForward 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const BatterDisplay = memo(({ batter }) => (
   <div className={cn(
@@ -123,9 +124,12 @@ const Umpire = () => {
             <Home className="w-5 h-5" />
           </Link>
           <h1 className="font-semibold text-lg">Umpire Mode</h1>
-          <Button variant="ghost" size="icon" onClick={() => setShowShareModal(true)} className="rounded-full">
-            <Share2 className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle className="rounded-full" />
+            <Button variant="ghost" size="icon" onClick={() => setShowShareModal(true)} className="rounded-full">
+              <Share2 className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
 
