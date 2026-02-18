@@ -1,7 +1,30 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { playSoundWithVibration, resumeAudioContext } from '@/utils/soundEffects';
+
+const getSoundType = (value) => {
+  if (value === 0) return 'dot';
+  if (value === 4) return 'boundary';
+  if (value === 6) return 'six';
+  if (value === 'W') return 'wicket';
+  if (value === 'WD') return 'wide';
+  if (value === 'NB') return 'noBall';
+  return 'run';
+};
 
 const ScoringControls = ({ onScore, onWicket, disabled }) => {
+  const handleScore = (value) => {
+    resumeAudioContext();
+    playSoundWithVibration(getSoundType(value));
+    onScore(value);
+  };
+
+  const handleWicket = () => {
+    resumeAudioContext();
+    playSoundWithVibration('wicket');
+    onWicket();
+  };
+
   const runButtons = [
     { value: 0, label: '0', variant: 'secondary' },
     { value: 1, label: '1', variant: 'outline' },
@@ -13,7 +36,7 @@ const ScoringControls = ({ onScore, onWicket, disabled }) => {
   ];
 
   const extraButtons = [
-    { value: 'W', label: 'W', variant: 'destructive', onClick: onWicket },
+    { value: 'W', label: 'W', variant: 'destructive', onClick: handleWicket },
     { value: 'WD', label: 'WD', variant: 'outline' },
     { value: 'NB', label: 'NB', variant: 'outline' },
     { value: 'LB', label: 'LB', variant: 'outline' },
@@ -34,7 +57,7 @@ const ScoringControls = ({ onScore, onWicket, disabled }) => {
                 value === 4 && "bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400",
                 value === 6 && "bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500"
               )}
-              onClick={() => onScore(value)}
+              onClick={() => handleScore(value)}
               disabled={disabled}
             >
               {label}
@@ -52,7 +75,7 @@ const ScoringControls = ({ onScore, onWicket, disabled }) => {
                 "h-12 text-sm font-bold rounded-xl transition-all active:scale-95",
                 value === 'W' && "shadow-md"
               )}
-              onClick={onClick || (() => onScore(value))}
+              onClick={onClick || (() => handleScore(value))}
               disabled={disabled}
             >
               {label}
