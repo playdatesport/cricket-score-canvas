@@ -66,7 +66,6 @@ const WelcomeScreen = ({ onNewMatch, onShowHistory, onNavigateStats, matchCount 
           <Settings className="w-5 h-5" />
         </Link>
       </div>
-      </div>
 
       {/* Hero Section */}
       <div className="gradient-hero pt-12 pb-8 px-4">
