@@ -11,6 +11,7 @@ import FullScorecard from "./pages/FullScorecard";
 import MatchSetup from "./pages/MatchSetup";
 import MatchAnalytics from "./pages/MatchAnalytics";
 import Statistics from "./pages/Statistics";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import InstallPrompt from "./components/InstallPrompt";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/setup" element={<MatchSetup />} />
             <Route path="/analytics" element={<MatchAnalytics />} />
             <Route path="/statistics" element={<Statistics />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
