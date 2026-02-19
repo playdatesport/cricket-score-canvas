@@ -6,7 +6,8 @@ import {
   Trophy, History, BarChart3, Plus, ChevronRight,
   Target, TrendingUp, Zap, Users
 } from 'lucide-react';
-import SettingsPanel from '@/components/SettingsPanel';
+import { Link } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 
 const FeatureCard = memo(({ icon: Icon, title, description, color, delay }) => (
   <div 
@@ -60,9 +61,11 @@ const WelcomeScreen = ({ onNewMatch, onShowHistory, onNavigateStats, matchCount 
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Settings - Top Right */}
       <div className="absolute top-4 right-4 z-10">
-        <SettingsPanel />
+        <Link to="/settings" className="p-2 rounded-full bg-card/80 backdrop-blur border border-border/50 text-muted-foreground hover:text-foreground transition-colors inline-flex">
+          <Settings className="w-5 h-5" />
+        </Link>
+      </div>
       </div>
 
       {/* Hero Section */}

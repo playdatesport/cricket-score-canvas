@@ -17,7 +17,7 @@ import {
   ClipboardList, Activity, SkipForward 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import SettingsPanel from '@/components/SettingsPanel';
+import { Settings } from 'lucide-react';
 
 const BatterDisplay = memo(({ batter }) => (
   <div className={cn(
@@ -125,7 +125,9 @@ const Umpire = () => {
           </Link>
           <h1 className="font-semibold text-lg">Umpire Mode</h1>
           <div className="flex items-center gap-1">
-            <SettingsPanel />
+            <Link to="/settings" className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-full">
+              <Settings className="w-5 h-5" />
+            </Link>
             <Button variant="ghost" size="icon" onClick={() => setShowShareModal(true)} className="rounded-full">
               <Share2 className="w-5 h-5" />
             </Button>
