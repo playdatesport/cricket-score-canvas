@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  ArrowLeft, Volume2, VolumeX, Vibrate, Check, Type, Palette, 
-  Sun, Moon, Pipette
+  ArrowLeft, Volume2, VolumeX, Vibrate, Check, Type, 
+  Sun, Moon, Monitor, Pipette
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,18 +37,21 @@ const Toggle = ({ enabled, onToggle, icon: Icon, label }) => (
   </button>
 );
 
+const PRESET_COLORS = [
+  '#3b82f6', '#ef4444', '#22c55e', '#f97316', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#eab308', '#14b8a6', '#6366f1',
+  '#f43f5e', '#10b981', '#a855f7', '#0ea5e9', '#d946ef',
+  '#84cc16', '#f59e0b', '#64748b', '#e11d48', '#2dd4bf',
+];
+
 const Settings = () => {
   const { soundEnabled, vibrationEnabled, toggleSound, toggleVibration } = useSettings();
-  const { 
-    mode, toggleTheme, isDark, colorTheme, setColorTheme, 
-    fontId, setFontId, themes, fonts, customColor, setCustomColor 
-  } = useTheme();
+  const { mode, toggleTheme, isDark, primaryColor, setPrimaryColor, fontId, setFontId, fonts } = useTheme();
 
-  const [pickerColor, setPickerColor] = useState(customColor || '#3b82f6');
+  const [pickerColor, setPickerColor] = useState(primaryColor);
 
-  const handleCustomColor = () => {
-    setCustomColor(pickerColor);
-    setColorTheme('custom');
+  const handleApplyColor = () => {
+    setPrimaryColor(pickerColor);
   };
 
   return (
@@ -76,64 +79,74 @@ const Settings = () => {
         {/* Appearance Section */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
-            Appearance
+            Mode
           </h2>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => isDark && toggleTheme()}
               className={cn(
-                "flex-1 p-4 rounded-2xl font-medium transition-all border-2 flex items-center justify-center gap-2",
-                !isDark ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-card text-muted-foreground"
+                "p-4 rounded-2xl font-medium transition-all border-2 flex flex-col items-center gap-2",
+                !isDark ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-card text-muted-foreground hover:bg-muted/50"
               )}
             >
-              <Sun className="w-5 h-5" /> Light
+              <Sun className="w-6 h-6" />
+              <span className="text-sm">Light</span>
             </button>
             <button
               onClick={() => !isDark && toggleTheme()}
               className={cn(
-                "flex-1 p-4 rounded-2xl font-medium transition-all border-2 flex items-center justify-center gap-2",
-                isDark ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-card text-muted-foreground"
+                "p-4 rounded-2xl font-medium transition-all border-2 flex flex-col items-center gap-2",
+                isDark ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-card text-muted-foreground hover:bg-muted/50"
               )}
             >
-              <Moon className="w-5 h-5" /> Dark
+              <Moon className="w-6 h-6" />
+              <span className="text-sm">Dark</span>
+            </button>
+            <button
+              onClick={() => {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (prefersDark !== isDark) toggleTheme();
+              }}
+              className={cn(
+                "p-4 rounded-2xl font-medium transition-all border-2 flex flex-col items-center gap-2",
+                "border-transparent bg-card text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <Monitor className="w-6 h-6" />
+              <span className="text-sm">System</span>
             </button>
           </div>
         </section>
 
-        {/* Color Themes Section */}
+        {/* Color Picker Section */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1 flex items-center gap-2">
-            <Palette className="w-4 h-4" /> Color Theme
+            <Pipette className="w-4 h-4" /> Accent Color
           </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {themes.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setColorTheme(t.id)}
-                className={cn(
-                  "p-3 rounded-2xl text-xs font-medium transition-all border-2 flex items-center gap-2",
-                  colorTheme === t.id
-                    ? "border-primary bg-primary/10"
-                    : "border-transparent bg-card hover:bg-muted/50"
-                )}
-              >
-                <span
-                  className="w-5 h-5 rounded-full shrink-0 shadow-sm"
-                  style={{ background: `hsl(${t.primary})` }}
-                />
-                <span className="truncate">{t.label}</span>
-                {colorTheme === t.id && <Check className="w-3 h-3 text-primary shrink-0 ml-auto" />}
-              </button>
-            ))}
-          </div>
 
-          {/* Custom Color Picker */}
-          <div className="p-4 rounded-2xl bg-card border border-border/50 space-y-3">
-            <div className="flex items-center gap-2">
-              <Pipette className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Custom Color</Label>
+          {/* Preset color swatches */}
+          <div className="p-4 rounded-2xl bg-card border border-border/50 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {PRESET_COLORS.map(color => (
+                <button
+                  key={color}
+                  onClick={() => { setPickerColor(color); setPrimaryColor(color); }}
+                  className={cn(
+                    "w-9 h-9 rounded-xl transition-all border-2 hover:scale-110",
+                    primaryColor === color ? "border-foreground scale-110 shadow-lg" : "border-transparent"
+                  )}
+                  style={{ background: color }}
+                  title={color}
+                >
+                  {primaryColor === color && (
+                    <Check className="w-4 h-4 text-white mx-auto drop-shadow-md" />
+                  )}
+                </button>
+              ))}
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Custom picker */}
+            <div className="flex items-center gap-3 pt-2 border-t border-border/50">
               <div className="relative">
                 <input
                   type="color"
@@ -150,19 +163,20 @@ const Settings = () => {
                 className="flex-1 h-12 rounded-xl font-mono text-sm"
                 maxLength={7}
               />
-              <Button
-                onClick={handleCustomColor}
-                className="h-12 rounded-xl px-5"
-                size="sm"
-              >
+              <Button onClick={handleApplyColor} className="h-12 rounded-xl px-5" size="sm">
                 Apply
               </Button>
             </div>
-            {colorTheme === 'custom' && (
-              <p className="text-xs text-primary flex items-center gap-1">
-                <Check className="w-3 h-3" /> Custom color active
-              </p>
-            )}
+
+            {/* Preview */}
+            <div className="flex items-center gap-3 pt-2">
+              <div className="h-10 flex-1 rounded-xl bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground text-sm font-semibold">Preview</span>
+              </div>
+              <div className="h-10 flex-1 rounded-xl bg-primary/20 flex items-center justify-center">
+                <span className="text-primary text-sm font-semibold">Subtle</span>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -201,9 +215,7 @@ const Settings = () => {
           </h2>
           <div className="p-4 rounded-2xl bg-card border border-border/50">
             <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                ['0', 'Dot ball'], ['1-6', 'Runs'], ['W', 'Wicket'],
-              ].map(([key, desc]) => (
+              {[['0', 'Dot ball'], ['1-6', 'Runs'], ['W', 'Wicket']].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-2">
                   <kbd className="px-2 py-1 rounded-lg bg-muted text-xs font-mono font-bold">{key}</kbd>
                   <span className="text-muted-foreground">{desc}</span>

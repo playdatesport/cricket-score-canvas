@@ -1,20 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const THEMES = [
-  { id: 'blue', label: 'Ocean Blue', primary: '221 83% 53%', accent: '199 89% 48%' },
-  { id: 'green', label: 'Cricket Green', primary: '142 71% 45%', accent: '160 84% 39%' },
-  { id: 'purple', label: 'Royal Purple', primary: '263 70% 50%', accent: '280 65% 60%' },
-  { id: 'orange', label: 'Sunset', primary: '25 95% 53%', accent: '38 92% 50%' },
-  { id: 'red', label: 'Crimson', primary: '0 84% 50%', accent: '350 80% 55%' },
-  { id: 'teal', label: 'Teal', primary: '174 72% 40%', accent: '187 76% 45%' },
-  { id: 'pink', label: 'Hot Pink', primary: '330 81% 60%', accent: '340 75% 55%' },
-  { id: 'indigo', label: 'Indigo', primary: '239 84% 67%', accent: '245 58% 51%' },
-  { id: 'amber', label: 'Amber', primary: '45 93% 47%', accent: '38 92% 50%' },
-  { id: 'cyan', label: 'Cyan', primary: '189 94% 43%', accent: '199 89% 48%' },
-  { id: 'rose', label: 'Rose', primary: '347 77% 50%', accent: '350 80% 60%' },
-  { id: 'emerald', label: 'Emerald', primary: '160 84% 39%', accent: '152 76% 44%' },
-];
-
 const FONTS = [
   { id: 'outfit', label: 'Outfit', family: "'Outfit', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap' },
   { id: 'inter', label: 'Inter', family: "'Inter', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' },
@@ -54,6 +39,22 @@ const hexToHsl = (hex) => {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 };
 
+// Inject theme transition style once
+const ensureTransitionStyle = () => {
+  if (document.getElementById('theme-transition-style')) return;
+  const style = document.createElement('style');
+  style.id = 'theme-transition-style';
+  style.textContent = `
+    .theme-transitioning,
+    .theme-transitioning *,
+    .theme-transitioning *::before,
+    .theme-transitioning *::after {
+      transition: background-color 0.5s ease, color 0.3s ease, border-color 0.4s ease, box-shadow 0.4s ease, fill 0.3s ease, stroke 0.3s ease !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 export const useTheme = () => {
   const [mode, setMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -64,48 +65,38 @@ export const useTheme = () => {
     return 'light';
   });
 
-  const [colorTheme, setColorTheme] = useState(() => {
-    return localStorage.getItem('cricket-color-theme') || 'blue';
-  });
-
-  const [customColor, setCustomColor] = useState(() => {
-    return localStorage.getItem('cricket-custom-color') || '#3b82f6';
+  const [primaryColor, setPrimaryColor] = useState(() => {
+    return localStorage.getItem('cricket-primary-color') || '#3b82f6';
   });
 
   const [fontId, setFontId] = useState(() => {
     return localStorage.getItem('cricket-font') || 'outfit';
   });
 
-  // Apply dark/light mode
+  // Apply dark/light mode with transition
   useEffect(() => {
     const root = document.documentElement;
+    ensureTransitionStyle();
+    root.classList.add('theme-transitioning');
     root.classList.remove('light', 'dark');
     root.classList.add(mode);
     localStorage.setItem('cricket-theme-mode', mode);
     localStorage.setItem('cricket-theme', mode);
+    const timer = setTimeout(() => root.classList.remove('theme-transitioning'), 600);
+    return () => clearTimeout(timer);
   }, [mode]);
 
-  // Apply color theme
+  // Apply primary color
   useEffect(() => {
     const root = document.documentElement;
-    if (colorTheme === 'custom') {
-      const hsl = hexToHsl(customColor);
-      root.style.setProperty('--primary', hsl);
-      root.style.setProperty('--accent', hsl);
-      root.style.setProperty('--ring', hsl);
-      root.style.setProperty('--sidebar-primary', hsl);
-      root.style.setProperty('--sidebar-ring', hsl);
-      localStorage.setItem('cricket-custom-color', customColor);
-    } else {
-      const theme = THEMES.find(t => t.id === colorTheme) || THEMES[0];
-      root.style.setProperty('--primary', theme.primary);
-      root.style.setProperty('--accent', theme.accent);
-      root.style.setProperty('--ring', theme.primary);
-      root.style.setProperty('--sidebar-primary', theme.primary);
-      root.style.setProperty('--sidebar-ring', theme.primary);
-    }
-    localStorage.setItem('cricket-color-theme', colorTheme);
-  }, [colorTheme, customColor, mode]);
+    const hsl = hexToHsl(primaryColor);
+    root.style.setProperty('--primary', hsl);
+    root.style.setProperty('--accent', hsl);
+    root.style.setProperty('--ring', hsl);
+    root.style.setProperty('--sidebar-primary', hsl);
+    root.style.setProperty('--sidebar-ring', hsl);
+    localStorage.setItem('cricket-primary-color', primaryColor);
+  }, [primaryColor, mode]);
 
   // Apply font
   useEffect(() => {
@@ -124,10 +115,8 @@ export const useTheme = () => {
 
   return {
     theme, mode, toggleTheme, isDark,
-    colorTheme, setColorTheme,
-    customColor, setCustomColor,
+    primaryColor, setPrimaryColor,
     fontId, setFontId,
-    themes: THEMES,
     fonts: FONTS,
   };
 };
